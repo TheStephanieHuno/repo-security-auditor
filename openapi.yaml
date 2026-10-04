@@ -1,0 +1,752 @@
+openapi: 3.0.3
+info:
+  title: Repo Security Auditor API
+  version: 1.0.0
+  description: |
+    REST API specification for repository security auditing, vulnerability scanning, 
+    finding review management, and AI-assisted PDF report generation.
+servers:
+  - url: http://localhost:8000/api
+    description: Local Development Server
+  - url: https://staging-api.reposecurityauditor.io/api
+    description: Staging Environment
+  - url: https://api.reposecurityauditor.io/api
+    description: Production Environment
+
+tags:
+  - name: Authentication
+  - name: Users & Settings
+  - name: Repositories
+  - name: Scans
+  - name: Findings
+  - name: Reports
+  - name: Dashboard
+  - name: Integrations
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── User & Auth ──
+    User:
+      type: object
+      required: [id, name, email, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Alex Security"
+        email:
+          type: string
+          format: email
+          example: "alex@example.com"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          example: "SecurePassword123!"
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: "Alex"
+        email:
+          type: string
+          format: email
+          example: "alex@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "SecurePassword123!"
+
+    AuthData:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          example: "sample.jwt.token"
+        user:
+          $ref: '#/components/schemas/User'
+
+    AuthResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/AuthData'
+
+    UserResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/User'
+
+    UpdateProfileRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          example: "Alex Updated"
+        email:
+          type: string
+          format: email
+          example: "alex.new@example.com"
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+
+    PasswordResetConfirm:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+          example: "valid-reset-token-xyz"
+        newPassword:
+          type: string
+          minLength: 8
+
+    NotificationSettings:
+      type: object
+      required: [onScanCompletion, onScanFailure]
+      properties:
+        onScanCompletion:
+          type: boolean
+          example: true
+        onScanFailure:
+          type: boolean
+          example: true
+
+    NotificationSettingsResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/NotificationSettings'
+
+    # ── Repositories ──
+    Repository:
+      type: object
+      required: [id, url, name, owner, provider, defaultBranch, isValid, addedBy, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          example: "https://github.com/org/core-repo"
+        name:
+          type: string
+          example: "core-repo"
+        owner:
+          type: string
+          example: "org"
+        provider:
+          type: string
+          example: "github"
+        defaultBranch:
+          type: string
+          example: "main"
+        isValid:
+          type: boolean
+          example: true
+        addedBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RepositoryResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/Repository'
+
+    RepositoryListResponse:
+      type: object
+      required: [status, data, pagination]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Repository'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ValidateRepositoryRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          example: "https://github.com/org/sample"
+
+    ValidateRepositoryData:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+          example: true
+        name:
+          type: string
+          example: "sample"
+        owner:
+          type: string
+          example: "org"
+        defaultBranch:
+          type: string
+          example: "main"
+
+    ValidateRepositoryResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/ValidateRepositoryData'
+
+    Branch:
+      type: object
+      required: [name, isDefault]
+      properties:
+        name:
+          type: string
+          example: "main"
+        isDefault:
+          type: boolean
+          example: true
+        lastCommit:
+          type: string
+          nullable: true
+          example: "7f3b4c1"
+
+    BranchListResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Branch'
+
+    AddRepositoryRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          example: "https://github.com/org/new-repo"
+
+    # ── Scans ──
+    ScanStatus:
+      type: string
+      enum: [queued, running, completed, failed, cancelled]
+      example: "completed"
+
+    FindingsCount:
+      type: object
+      required: [critical, high, medium, low, info]
+      properties:
+        critical:
+          type: integer
+          example: 1
+        high:
+          type: integer
+          example: 3
+        medium:
+          type: integer
+          example: 5
+        low:
+          type: integer
+          example: 2
+        info:
+          type: integer
+          example: 0
+
+    Scan:
+      type: object
+      required: [id, repositoryId, branch, status, progress, findingsCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        repositoryId:
+          type: string
+          format: uuid
+        branch:
+          type: string
+          example: "main"
+        status:
+          $ref: '#/components/schemas/ScanStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 100
+        findingsCount:
+          $ref: '#/components/schemas/FindingsCount'
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ScanResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/Scan'
+
+    ScanListResponse:
+      type: object
+      required: [status, data, pagination]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scan'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ScanProgressData:
+      type: object
+      required: [id, status, progress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ScanStatus'
+        progress:
+          type: integer
+          example: 45
+
+    ScanProgressResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/ScanProgressData'
+
+    StartScanRequest:
+      type: object
+      required: [repositoryId, branch]
+      properties:
+        repositoryId:
+          type: string
+          format: uuid
+        branch:
+          type: string
+          example: "develop"
+
+    # ── Findings ──
+    Severity:
+      type: string
+      enum: [critical, high, medium, low, info]
+      example: "high"
+
+    ReviewStatus:
+      type: string
+      enum: [open, acknowledged, false_positive, resolved]
+      example: "open"
+
+    Finding:
+      type: object
+      required: [id, scanId, repositoryId, severity, category, title, description, filePath, recommendation, reviewStatus, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanId:
+          type: string
+          format: uuid
+        repositoryId:
+          type: string
+          format: uuid
+        severity:
+          $ref: '#/components/schemas/Severity'
+        category:
+          type: string
+          example: "Secret Exposure"
+        title:
+          type: string
+          example: "Hardcoded AWS Access Key"
+        description:
+          type: string
+          example: "An AWS secret access key was found in plain text configuration."
+        filePath:
+          type: string
+          example: "src/config/aws.ts"
+        lineStart:
+          type: integer
+          nullable: true
+          example: 14
+        lineEnd:
+          type: integer
+          nullable: true
+          example: 14
+        codeSnippet:
+          type: string
+          nullable: true
+          example: "const AWS_KEY = 'AKIAIOSFODNN7EXAMPLE';"
+        recommendation:
+          type: string
+          example: "Rotate the exposed key immediately and use environment variables."
+        aiExplanation:
+          type: string
+          nullable: true
+          example: "The key was checked into git history 3 commits ago."
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+        reviewNote:
+          type: string
+          nullable: true
+        reviewedBy:
+          type: string
+          format: uuid
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FindingResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/Finding'
+
+    FindingListResponse:
+      type: object
+      required: [status, data, pagination]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ReviewFindingRequest:
+      type: object
+      required: [reviewStatus]
+      properties:
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+        reviewNote:
+          type: string
+          nullable: true
+          example: "Verified false positive."
+
+    # ── Reports ──
+    ReportStatus:
+      type: string
+      enum: [generating, ready, failed]
+      example: "ready"
+
+    Report:
+      type: object
+      required: [id, scanId, status, format, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        format:
+          type: string
+          example: "pdf"
+        fileUrl:
+          type: string
+          nullable: true
+          example: "https://api.reposecurityauditor.io/api/reports/123/pdf"
+        fileSize:
+          type: integer
+          nullable: true
+          example: 245892
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ReportResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/Report'
+
+    ReportListResponse:
+      type: object
+      required: [status, data, pagination]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    GenerateReportRequest:
+      type: object
+      required: [scanId]
+      properties:
+        scanId:
+          type: string
+          format: uuid
+
+    # ── Dashboard & Integrations ──
+    DashboardMetricsData:
+      type: object
+      required: [repositories, scans, findings, recentScans, recentFindings]
+      properties:
+        repositories:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 8
+        scans:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 42
+            queued:
+              type: integer
+              example: 1
+            running:
+              type: integer
+              example: 1
+            completed:
+              type: integer
+              example: 36
+            failed:
+              type: integer
+              example: 2
+            cancelled:
+              type: integer
+              example: 2
+        findings:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 120
+            open:
+              type: integer
+              example: 45
+            critical:
+              type: integer
+              example: 4
+            high:
+              type: integer
+              example: 12
+            medium:
+              type: integer
+              example: 18
+            low:
+              type: integer
+              example: 11
+            info:
+              type: integer
+              example: 0
+        recentScans:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scan'
+        recentFindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+
+    DashboardResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/DashboardMetricsData'
+
+    GitHubIntegrationData:
+      type: object
+      required: [connected]
+      properties:
+        connected:
+          type: boolean
+          example: true
+        username:
+          type: string
+          nullable: true
+          example: "octocat"
+        connectedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    GitHubIntegrationResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/GitHubIntegrationData'
+
+    # ── Shared Envelope & Errors ──
+    PaginationMeta:
+      type: object
+      required: [page, pageSize, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          example: 84
+        totalPages:
+          type: integer
+          example: 5
+
+    GenericSuccessResponse:
+      type: object
+      required: [status, data]
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Operation completed successfully."
+
+    ErrorResponse:
+      type: object
+      required: [status, error]
+      properties:
+        status:
+          type: string
+          example: "error"
+        error:
+          type: object
+          required: [code, message]
