@@ -1,17 +1,35 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import our new modular routers
-from app.routers import auth, repositories, scans
+from app.db.session import engine, Base
+from app.routers import (
+    auth,
+    users,
+    repositories,
+    scans,
+    findings,
+    reports,
+    dashboard,
+    integrations,
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-creates database tables on startup if not present
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
 app = FastAPI(
     title="Repo Security Auditor API",
     version="1.0.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
-# Enable CORS for Next.js front end
+# Enable CORS for Next.js / front end
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -20,10 +38,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount all router modules under /api
+# Mount all 8 feature routers under /api
 app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 app.include_router(repositories.router, prefix="/api")
 app.include_router(scans.router, prefix="/api")
+app.include_router(findings.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
+app.include_router(integrations.router, prefix="/api")
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():

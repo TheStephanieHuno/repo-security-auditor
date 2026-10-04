@@ -2,36 +2,28 @@ openapi: 3.0.3
 info:
   title: Repo Security Auditor API
   version: 1.0.0
-  description: |
-    REST API specification for repository security auditing, vulnerability scanning, 
-    finding review management, and AI-assisted PDF report generation.
+  description: REST API for repository security auditing, scanning, finding review, and PDF report generation.
 servers:
   - url: http://localhost:8000/api
-    description: Local Development Server
-  - url: https://staging-api.reposecurityauditor.io/api
-    description: Staging Environment
+    description: Local Development
   - url: https://api.reposecurityauditor.io/api
-    description: Production Environment
-
+    description: Production
 tags:
   - name: Authentication
-  - name: Users & Settings
+  - name: Users
   - name: Repositories
   - name: Scans
   - name: Findings
   - name: Reports
   - name: Dashboard
   - name: Integrations
-
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   schemas:
-    # ── User & Auth ──
     User:
       type: object
       required: [id, name, email, createdAt, updatedAt]
@@ -41,18 +33,17 @@ components:
           format: uuid
         name:
           type: string
-          example: "Alex Security"
+          example: Alex
         email:
           type: string
           format: email
-          example: "alex@example.com"
+          example: alex@example.com
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-
     LoginRequest:
       type: object
       required: [email, password]
@@ -60,69 +51,54 @@ components:
         email:
           type: string
           format: email
-          example: "user@example.com"
         password:
           type: string
-          example: "SecurePassword123!"
-
     RegisterRequest:
       type: object
       required: [name, email, password]
       properties:
         name:
           type: string
-          example: "Alex"
+          minLength: 1
         email:
           type: string
           format: email
-          example: "alex@example.com"
         password:
           type: string
           minLength: 8
-          example: "SecurePassword123!"
-
-    AuthData:
-      type: object
-      required: [token, user]
-      properties:
-        token:
-          type: string
-          example: "sample.jwt.token"
-        user:
-          $ref: '#/components/schemas/User'
-
     AuthResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
-          $ref: '#/components/schemas/AuthData'
-
+          type: object
+          required: [token, user]
+          properties:
+            token:
+              type: string
+            user:
+              $ref: '#/components/schemas/User'
     UserResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/User'
-
     UpdateProfileRequest:
       type: object
       required: [name, email]
       properties:
         name:
           type: string
-          example: "Alex Updated"
         email:
           type: string
           format: email
-          example: "alex.new@example.com"
-
     ChangePasswordRequest:
       type: object
       required: [currentPassword, newPassword]
@@ -132,7 +108,6 @@ components:
         newPassword:
           type: string
           minLength: 8
-
     PasswordResetRequest:
       type: object
       required: [email]
@@ -140,19 +115,15 @@ components:
         email:
           type: string
           format: email
-          example: "user@example.com"
-
     PasswordResetConfirm:
       type: object
       required: [token, newPassword]
       properties:
         token:
           type: string
-          example: "valid-reset-token-xyz"
         newPassword:
           type: string
           minLength: 8
-
     NotificationSettings:
       type: object
       required: [onScanCompletion, onScanFailure]
@@ -163,18 +134,15 @@ components:
         onScanFailure:
           type: boolean
           example: true
-
     NotificationSettingsResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/NotificationSettings'
-
-    # ── Repositories ──
     Repository:
       type: object
       required: [id, url, name, owner, provider, defaultBranch, isValid, addedBy, createdAt, updatedAt]
@@ -184,22 +152,21 @@ components:
           format: uuid
         url:
           type: string
-          example: "https://github.com/org/core-repo"
+          example: https://github.com/org/repo
         name:
           type: string
-          example: "core-repo"
+          example: repo
         owner:
           type: string
-          example: "org"
+          example: org
         provider:
           type: string
-          example: "github"
+          example: github
         defaultBranch:
           type: string
-          example: "main"
+          example: main
         isValid:
           type: boolean
-          example: true
         addedBy:
           type: string
           format: uuid
@@ -209,110 +176,88 @@ components:
         updatedAt:
           type: string
           format: date-time
-
     RepositoryResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/Repository'
-
     RepositoryListResponse:
       type: object
       required: [status, data, pagination]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: array
           items:
             $ref: '#/components/schemas/Repository'
         pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-
-    ValidateRepositoryRequest:
+          $ref: '#/components/schemas/Pagination'
+    ValidateRepoRequest:
       type: object
       required: [url]
       properties:
         url:
           type: string
-          example: "https://github.com/org/sample"
-
-    ValidateRepositoryData:
-      type: object
-      required: [valid]
-      properties:
-        valid:
-          type: boolean
-          example: true
-        name:
-          type: string
-          example: "sample"
-        owner:
-          type: string
-          example: "org"
-        defaultBranch:
-          type: string
-          example: "main"
-
-    ValidateRepositoryResponse:
+    ValidateRepoResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
-          $ref: '#/components/schemas/ValidateRepositoryData'
-
+          type: object
+          required: [valid]
+          properties:
+            valid:
+              type: boolean
+            name:
+              type: string
+            owner:
+              type: string
+            defaultBranch:
+              type: string
     Branch:
       type: object
       required: [name, isDefault]
       properties:
         name:
           type: string
-          example: "main"
+          example: main
         isDefault:
           type: boolean
-          example: true
         lastCommit:
           type: string
           nullable: true
-          example: "7f3b4c1"
-
+          example: 7f3b4c1
     BranchListResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: array
           items:
             $ref: '#/components/schemas/Branch'
-
-    AddRepositoryRequest:
+    AddRepoRequest:
       type: object
       required: [url]
       properties:
         url:
           type: string
-          example: "https://github.com/org/new-repo"
-
-    # ── Scans ──
     ScanStatus:
       type: string
       enum: [queued, running, completed, failed, cancelled]
-      example: "completed"
-
     FindingsCount:
       type: object
-      required: [critical, high, medium, low, info]
       properties:
         critical:
           type: integer
@@ -329,7 +274,6 @@ components:
         info:
           type: integer
           example: 0
-
     Scan:
       type: object
       required: [id, repositoryId, branch, status, progress, findingsCount, createdAt, updatedAt]
@@ -342,14 +286,13 @@ components:
           format: uuid
         branch:
           type: string
-          example: "main"
+          example: main
         status:
           $ref: '#/components/schemas/ScanStatus'
         progress:
           type: integer
           minimum: 0
           maximum: 100
-          example: 100
         findingsCount:
           $ref: '#/components/schemas/FindingsCount'
         startedAt:
@@ -370,54 +313,46 @@ components:
         updatedAt:
           type: string
           format: date-time
-
     ScanResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/Scan'
-
     ScanListResponse:
       type: object
       required: [status, data, pagination]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: array
           items:
             $ref: '#/components/schemas/Scan'
         pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-
-    ScanProgressData:
-      type: object
-      required: [id, status, progress]
-      properties:
-        id:
-          type: string
-          format: uuid
-        status:
-          $ref: '#/components/schemas/ScanStatus'
-        progress:
-          type: integer
-          example: 45
-
+          $ref: '#/components/schemas/Pagination'
     ScanProgressResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
-          $ref: '#/components/schemas/ScanProgressData'
-
+          type: object
+          required: [id, status, progress]
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              $ref: '#/components/schemas/ScanStatus'
+            progress:
+              type: integer
     StartScanRequest:
       type: object
       required: [repositoryId, branch]
@@ -427,19 +362,13 @@ components:
           format: uuid
         branch:
           type: string
-          example: "develop"
-
-    # ── Findings ──
+          example: develop
     Severity:
       type: string
       enum: [critical, high, medium, low, info]
-      example: "high"
-
     ReviewStatus:
       type: string
       enum: [open, acknowledged, false_positive, resolved]
-      example: "open"
-
     Finding:
       type: object
       required: [id, scanId, repositoryId, severity, category, title, description, filePath, recommendation, reviewStatus, createdAt]
@@ -457,35 +386,29 @@ components:
           $ref: '#/components/schemas/Severity'
         category:
           type: string
-          example: "Secret Exposure"
+          example: Secret Exposure
         title:
           type: string
-          example: "Hardcoded AWS Access Key"
+          example: Hardcoded AWS Key
         description:
           type: string
-          example: "An AWS secret access key was found in plain text configuration."
         filePath:
           type: string
-          example: "src/config/aws.ts"
+          example: src/config.ts
         lineStart:
           type: integer
           nullable: true
-          example: 14
         lineEnd:
           type: integer
           nullable: true
-          example: 14
         codeSnippet:
           type: string
           nullable: true
-          example: "const AWS_KEY = 'AKIAIOSFODNN7EXAMPLE';"
         recommendation:
           type: string
-          example: "Rotate the exposed key immediately and use environment variables."
         aiExplanation:
           type: string
           nullable: true
-          example: "The key was checked into git history 3 commits ago."
         reviewStatus:
           $ref: '#/components/schemas/ReviewStatus'
         reviewNote:
@@ -502,31 +425,28 @@ components:
         createdAt:
           type: string
           format: date-time
-
     FindingResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/Finding'
-
     FindingListResponse:
       type: object
       required: [status, data, pagination]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: array
           items:
             $ref: '#/components/schemas/Finding'
         pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-
+          $ref: '#/components/schemas/Pagination'
     ReviewFindingRequest:
       type: object
       required: [reviewStatus]
@@ -536,14 +456,9 @@ components:
         reviewNote:
           type: string
           nullable: true
-          example: "Verified false positive."
-
-    # ── Reports ──
     ReportStatus:
       type: string
       enum: [generating, ready, failed]
-      example: "ready"
-
     Report:
       type: object
       required: [id, scanId, status, format, createdAt]
@@ -558,15 +473,13 @@ components:
           $ref: '#/components/schemas/ReportStatus'
         format:
           type: string
-          example: "pdf"
+          example: pdf
         fileUrl:
           type: string
           nullable: true
-          example: "https://api.reposecurityauditor.io/api/reports/123/pdf"
         fileSize:
           type: integer
           nullable: true
-          example: 245892
         createdAt:
           type: string
           format: date-time
@@ -574,31 +487,28 @@ components:
           type: string
           format: date-time
           nullable: true
-
     ReportResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           $ref: '#/components/schemas/Report'
-
     ReportListResponse:
       type: object
       required: [status, data, pagination]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: array
           items:
             $ref: '#/components/schemas/Report'
         pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-
+          $ref: '#/components/schemas/Pagination'
     GenerateReportRequest:
       type: object
       required: [scanId]
@@ -606,9 +516,7 @@ components:
         scanId:
           type: string
           format: uuid
-
-    # ── Dashboard & Integrations ──
-    DashboardMetricsData:
+    DashboardMetrics:
       type: object
       required: [repositories, scans, findings, recentScans, recentFindings]
       properties:
@@ -617,52 +525,38 @@ components:
           properties:
             total:
               type: integer
-              example: 8
         scans:
           type: object
           properties:
             total:
               type: integer
-              example: 42
             queued:
               type: integer
-              example: 1
             running:
               type: integer
-              example: 1
             completed:
               type: integer
-              example: 36
             failed:
               type: integer
-              example: 2
             cancelled:
               type: integer
-              example: 2
         findings:
           type: object
           properties:
             total:
               type: integer
-              example: 120
             open:
               type: integer
-              example: 45
             critical:
               type: integer
-              example: 4
             high:
               type: integer
-              example: 12
             medium:
               type: integer
-              example: 18
             low:
               type: integer
-              example: 11
             info:
               type: integer
-              example: 0
         recentScans:
           type: array
           items:
@@ -671,45 +565,38 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Finding'
-
     DashboardResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
-          $ref: '#/components/schemas/DashboardMetricsData'
-
-    GitHubIntegrationData:
+          $ref: '#/components/schemas/DashboardMetrics'
+    GitHubIntegration:
       type: object
       required: [connected]
       properties:
         connected:
           type: boolean
-          example: true
         username:
           type: string
           nullable: true
-          example: "octocat"
         connectedAt:
           type: string
           format: date-time
           nullable: true
-
-    GitHubIntegrationResponse:
+    GitHubResponse:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
-          $ref: '#/components/schemas/GitHubIntegrationData'
-
-    # ── Shared Envelope & Errors ──
-    PaginationMeta:
+          $ref: '#/components/schemas/GitHubIntegration'
+    Pagination:
       type: object
       required: [page, pageSize, totalItems, totalPages]
       properties:
@@ -725,28 +612,701 @@ components:
         totalPages:
           type: integer
           example: 5
-
-    GenericSuccessResponse:
+    GenericSuccess:
       type: object
       required: [status, data]
       properties:
         status:
           type: string
-          example: "success"
+          example: success
         data:
           type: object
           properties:
             message:
               type: string
-              example: "Operation completed successfully."
-
     ErrorResponse:
       type: object
       required: [status, error]
       properties:
         status:
           type: string
-          example: "error"
+          example: error
         error:
           type: object
           required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Sign up
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Email already exists
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Sign out
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Logged out
+  /auth/password-reset/request:
+    post:
+      tags: [Authentication]
+      summary: Request password reset
+      description: Always returns neutral message regardless of email existence.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Neutral success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+  /auth/password-reset/confirm:
+    post:
+      tags: [Authentication]
+      summary: Set new password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirm'
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccess'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Current user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+    put:
+      tags: [Users]
+      summary: Update profile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+  /users/me/password:
+    put:
+      tags: [Users]
+      summary: Change password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed
+        '400':
+          description: Current password incorrect
+  /users/me/settings:
+    get:
+      tags: [Users]
+      summary: Read notification settings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Notification choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettingsResponse'
+    put:
+      tags: [Users]
+      summary: Save notification settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettingsResponse'
+  /repositories:
+    get:
+      tags: [Repositories]
+      summary: Repository list
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paged repositories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryListResponse'
+    post:
+      tags: [Repositories]
+      summary: Add repository
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRepoRequest'
+      responses:
+        '201':
+          description: Repository added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryResponse'
+  /repositories/validate:
+    post:
+      tags: [Repositories]
+      summary: Check repository
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRepoRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateRepoResponse'
+  /repositories/{id}:
+    get:
+      tags: [Repositories]
+      summary: Repository details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryResponse'
+        '404':
+          description: Not found
+    delete:
+      tags: [Repositories]
+      summary: Remove repository
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Removed
+  /repositories/{id}/branches:
+    get:
+      tags: [Repositories]
+      summary: Branch list
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Branches with default marker and optional commit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchListResponse'
+  /scans:
+    get:
+      tags: [Scans]
+      summary: Scan history
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: repositoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paged scans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanListResponse'
+    post:
+      tags: [Scans]
+      summary: Start scan
+      description: Also used for Rescan of failed, cancelled, or completed scans.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartScanRequest'
+      responses:
+        '201':
+          description: Scan queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+  /scans/{id}:
+    get:
+      tags: [Scans]
+      summary: Scan details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Scan details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+  /scans/{id}/status:
+    get:
+      tags: [Scans]
+      summary: Scan progress
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status and progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanProgressResponse'
+  /scans/{id}/cancel:
+    post:
+      tags: [Scans]
+      summary: Cancel scan
+      description: Only valid for queued or running scans.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Scan cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '422':
+          description: Scan not in cancellable state
+  /scans/{id}/findings:
+    get:
+      tags: [Scans]
+      summary: Scan findings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: reviewStatus
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paged findings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingListResponse'
+  /findings:
+    get:
+      tags: [Findings]
+      summary: Findings list
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: repositoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: scanId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: reviewStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paged findings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingListResponse'
+  /findings/{id}:
+    get:
+      tags: [Findings]
+      summary: Finding details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Finding details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingResponse'
+    patch:
+      tags: [Findings]
+      summary: Review finding
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewFindingRequest'
+      responses:
+        '200':
+          description: Updated finding
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingResponse'
+  /reports:
+    get:
+      tags: [Reports]
+      summary: Reports list
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paged reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportListResponse'
+    post:
+      tags: [Reports]
+      summary: Generate report
+      description: Starts or repeats PDF generation for a completed scan.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateReportRequest'
+      responses:
+        '201':
+          description: Report generating
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+  /reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Report details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Report status and details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+  /reports/{id}/pdf:
+    get:
+      tags: [Reports]
+      summary: Download report
+      description: Returns PDF for preview or download.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /dashboard/metrics:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Counts and recent items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+  /integrations/github:
+    get:
+      tags: [Integrations]
+      summary: GitHub status
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubResponse'
+    post:
+      tags: [Integrations]
+      summary: Connect GitHub
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubResponse'
+    delete:
+      tags: [Integrations]
+      summary: Disconnect GitHub
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Disconnected
