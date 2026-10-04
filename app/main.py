@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.session import engine, Base
+from app.db import models  # <-- IMPORT MODELS SO TABLES ARE REGISTERED
 from app.routers import (
     auth,
     users,
@@ -16,7 +17,7 @@ from app.routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Auto-creates database tables on startup if not present
+    # Creates all tables in app.db automatically on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -29,7 +30,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for Next.js / front end
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -38,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount all 8 feature routers under /api
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(repositories.router, prefix="/api")
