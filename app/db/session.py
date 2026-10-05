@@ -1,13 +1,19 @@
+import os
+from collections.abc import AsyncIterator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-DATABASE_URL = "sqlite+aiosqlite:///./app.db"
-
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-    connect_args={"check_same_thread": False},
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite+aiosqlite:///./app.db",
 )
+
+engine_kwargs = {"echo": False}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -18,7 +24,7 @@ AsyncSessionLocal = async_sessionmaker(
 class Base(DeclarativeBase):
     pass
 
-async def get_db():
+async def get_db() -> AsyncIterator[AsyncSession]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
