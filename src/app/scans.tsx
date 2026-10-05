@@ -36,9 +36,10 @@ import {
   scannerInfo,
   scanStages,
   type ScanStatus,
-} from "./data"
+} from "@/lib/security-model"
 import {
   Breadcrumbs,
+  CancelScanDialog,
   categoryIcons,
   DownloadReport,
   EmptyState,
@@ -57,18 +58,36 @@ import {
   SeverityDistribution,
   StatusBadge,
 } from "./components"
-import { useStore } from "./store"
+import { useRepositories, useScans, useFindings } from "@/lib/api/hooks"
 import { FindingsList } from "./findings"
 
 export function ScanHistory() {
-  const store = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("All statuses")
   const [date, setDate] = useState("All dates")
   const [repoFilter, setRepoFilter] = useState("All repositories")
   const [scanOpen, setScanOpen] = useState(false)
-  const list = store.scans.filter((scan) => {
-    const repo = store.repositories.find(
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  const list = scans.filter((scan) => {
+    const repo = repositories.find(
       (repositoryRecord) => repositoryRecord.id === scan.repoId,
     )
     return (
@@ -105,7 +124,7 @@ export function ScanHistory() {
           onChange={setRepoFilter}
           options={[
             "All repositories",
-            ...store.repositories.map(
+            ...repositories.map(
               (repositoryRecord) => repositoryRecord.name,
             ),
           ]}
@@ -144,11 +163,11 @@ export function ScanHistory() {
           </TableHeader>
           <TableBody>
             {list.map((scan) => {
-              const repo = store.repositories.find(
+              const repo = repositories.find(
                 (repositoryRecord) => repositoryRecord.id === scan.repoId,
               )!
               const findings = ["Completed", "Partial"].includes(scan.status)
-                ? getScanFindings(scan, store.findings)
+                ? getScanFindings(scan, allFindings)
                 : []
               return (
                 <TableRow key={scan.id}>
@@ -160,7 +179,7 @@ export function ScanHistory() {
                       {repo.name}
                     </Link>
                     <p className="mt-1 font-mono text-xs text-muted-foreground">
-                      #{scan.id} · {repo.branch}
+                      #{scan.id} · {scan.branch || repo.branch}
                     </p>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -227,7 +246,7 @@ export function ScanHistory() {
         {list.length === 0 && (
           <EmptyState
             title={
-              store.scans.length
+              scans.length
                 ? "No scans match your filters"
                 : "No scans yet"
             }
@@ -253,7 +272,7 @@ export function ScanHistory() {
           <Panel>
             <EmptyState
               title={
-                store.scans.length
+                scans.length
                   ? "No scans match your filters"
                   : "No scans yet"
               }
@@ -279,7 +298,7 @@ export function ScanHistory() {
             <div className="space-y-3 p-4">
               <Link to={`/scans/${scan.id}`} className="text-sm font-medium">
                 {
-                  store.repositories.find(
+                  repositories.find(
                     (repositoryRecord) => repositoryRecord.id === scan.repoId,
                   )?.name
                 }
@@ -309,11 +328,32 @@ export function ScanHistory() {
 
 export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
   const { id } = useParams()
-  const store = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [scanOpen, setScanOpen] = useState(false)
-  const original = store.scans.find((scan) => scan.id === id)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  function retry() { setScanOpen(true) }
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  const original = scans.find((scan) => scan.id === id)
   const override = params.get("state")
   const scan =
     original &&
@@ -330,8 +370,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           progress: override === "running" ? 43 : original.progress,
         }
       : original)
-  const repo = store.repositories.find((item) => item.id === scan?.repoId)
-  if (store.isRestricted(undefined, id)) return <AccessDenied />
+  const repo = repositories.find((item) => item.id === scan?.repoId)
   if (!scan || !repo)
     return (
       <EmptyState
@@ -340,14 +379,14 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
         action={<LinkButton to="/scans">View scan history</LinkButton>}
       />
     )
-  const findings = getScanFindings(scan, store.findings)
-  const previous = store.scans.find(
+  const findings = getScanFindings(scan, allFindings)
+  const previous = scans.find(
     (item) =>
       item.repoId === repo.id &&
       Number(item.id) < Number(scan.id) &&
       ["Completed", "Partial"].includes(item.status),
   )
-  const priorFindings = getScanFindings(previous, store.findings)
+  const priorFindings = getScanFindings(previous, allFindings)
   const tab = findingsTab ? "findings" : params.get("tab") || "overview"
   const progressView =
     ["Queued", "Running", "Failed"].includes(scan.status) &&
@@ -367,21 +406,10 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
         }`,
       )
   }
-  function retry() {
-    try {
-      navigate(`/scans/${store.retryScan(scan!.id)}`)
-    } catch (failure) {
-      toast.error(
-        failure instanceof Error
-          ? failure.message
-          : "Could not retry. Available evidence is retained.",
-      )
-    }
-  }
   return (
     <PageState kind="Scan results">
       {scan.retryOf && (
-        <Notice title="Retry with preserved evidence">
+        <Notice title="Rescan with preserved evidence">
           This is a new scan attempt.{" "}
           <Link to={`/scans/${scan.retryOf}`} className="underline">
             Original scan #{scan.retryOf}
@@ -487,7 +515,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                 <span>
                   Branch:{" "}
                   <span className="font-mono text-foreground">
-                    {repo.branch}
+                    {scan.branch || repo.branch}
                   </span>
                 </span>
                 <span>
@@ -636,15 +664,12 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
               {scan.status === "Queued" && !scan.isNew ? (
                 <Button onClick={retry}>
                   <Play className="size-3" />
-                  Run queued demo
+                  Start security scan
                 </Button>
               ) : (
                 scan.status !== "Failed" && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      Cancellation isn't supported in this prototype.
-                    </span>
-                    <Button variant="outline" disabled>
+                    <Button variant="outline" onClick={() => setCancelOpen(true)}>
                       Cancel scan
                     </Button>
                   </div>
@@ -661,7 +686,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={retry}>
                       <RotateCcw className="size-3" />
-                      Retry scan
+                      Rescan
                     </Button>
                     <LinkButton to={`/repositories/${repo.id}?tab=findings`}>
                       View previous findings
@@ -690,7 +715,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     </LinkButton>
                     <Button variant="outline" onClick={retry}>
                       <RotateCcw className="size-3" />
-                      Retry failed check
+                      Rescan
                     </Button>
                   </div>
                 }
@@ -743,7 +768,8 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     </div>
                     <SeverityDistribution findings={findings} />
                   </div>
-                </Panel>
+          </Panel>
+          {(scan.status === "Queued" || scan.status === "Running") && <CancelScanDialog scanId={scan.id} open={cancelOpen} onOpenChange={setCancelOpen} />}
                 <Panel>
                   <PanelHeader title="Scan context" />
                   <dl className="space-y-4 px-5 pb-5 text-xs">
@@ -752,7 +778,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                         "Status",
                         <StatusBadge key="status" status={scan.status} />,
                       ],
-                      ["Branch", repo.branch],
+                        ["Branch", scan.branch || repo.branch],
                       ["Commit", scan.commit || repo.commit],
                       ["Duration", scan.duration],
                       [
@@ -934,7 +960,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     <Panel key={scanner.name}>
                       <div className="p-5">
                         <div className="flex items-center justify-between">
-                          <Heading level={2}>{scanner.name}</Heading>
+                          <Heading level={2}>{scanner.description}</Heading>
                           <StatusBadge
                             status={
                               failed
@@ -946,7 +972,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                           />
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {scanner.description}
+                          {scanner.category} scanner
                         </p>
                         <div className="mt-6 flex gap-8">
                           <div>
@@ -991,7 +1017,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                             className="w-full"
                             onClick={retry}
                           >
-                            Retry failed check
+                            Rescan
                           </Button>
                         ) : (
                           <LinkButton
@@ -1012,7 +1038,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
             <TabsContent value="history">
               <Panel>
                 <PanelHeader title="Repository scan history" />
-                {store.scans
+                {scans
                   .filter((scanRecord) => scanRecord.repoId === repo.id)
                   .map((item) => (
                     <Link
@@ -1033,7 +1059,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           </Tabs>
         </>
       )}
-      <ScanDialog repo={repo} open={scanOpen} onOpenChange={setScanOpen} />
+      <ScanDialog repo={repo} initialBranch={scan.branch || repo.branch} open={scanOpen} onOpenChange={setScanOpen} />
     </PageState>
   )
 }

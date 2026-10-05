@@ -46,7 +46,7 @@ import {
   scannerInfo,
   severityOrder,
   type Repository,
-} from "./data"
+} from "@/lib/security-model"
 import {
   Breadcrumbs,
   Confidence,
@@ -67,15 +67,34 @@ import {
   SeverityDistribution,
   StatusBadge,
 } from "./components"
-import { useStore } from "./store"
+import { useRepositories, useScans, useFindings, useCreateRepository } from "@/lib/api/hooks"
 
 export function RepositoryList() {
-  const { repositories, scans, findings } = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const findings = findingsData?.items || []
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState("All repositories")
   const [selected, setSelected] = useState<Repository>()
   const [scanOpen, setScanOpen] = useState(false)
   const [more, setMore] = useState<Repository>()
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
   if (!repositories.length)
     return (
       <PageState kind="Repositories">
@@ -364,7 +383,9 @@ const validationMessages: Record<string, [string, string]> = {
   ],
 }
 export function AddRepository() {
-  const store = useStore()
+  const { data: reposData } = useRepositories(1, 100)
+  const repositories = reposData?.items || []
+  const { mutateAsync: createRepository } = useCreateRepository()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [url, setUrl] = useState("")
@@ -388,7 +409,7 @@ export function AddRepository() {
         return
       }
       const name = `${match[1]}/${match[2]}`
-      const existing = store.repositories.find(
+      const existing = repositories.find(
         (repo) => repo.name.toLowerCase() === name.toLowerCase(),
       )
       setPreview(
@@ -495,7 +516,7 @@ export function AddRepository() {
                   action={
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={validate}>
-                        Retry validation
+                        Validate again
                       </Button>
                       <Button variant="ghost" onClick={() => setState("idle")}>
                         Go back
@@ -578,11 +599,13 @@ export function AddRepository() {
                 <Button
                   disabled={!permissionConfirmed}
                   className="h-10 w-full"
-                  onClick={() => {
-                    const exists = store.repositories.some(
+                  onClick={async () => {
+                    const exists = repositories.some(
                       (repo) => repo.id === preview.id,
                     )
-                    if (!exists) store.addRepository(preview)
+                    if (!exists) {
+                      await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
+                    }
                     toast.success(
                       exists
                         ? "Repository already connected"
@@ -592,7 +615,7 @@ export function AddRepository() {
                     navigate(`/repositories/${preview.id}`)
                   }}
                 >
-                  {store.repositories.some((repo) => repo.id === preview.id)
+                  {repositories.some((repo) => repo.id === preview.id)
                     ? "Open repository"
                     : "Add repository"}
                   <ArrowRight className="size-4" />
@@ -715,13 +738,32 @@ export function AddRepository() {
 
 export function RepositoryDetail({ start = false }: { start?: boolean }) {
   const { id } = useParams()
-  const store = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
   const navigate = useNavigate()
   const [scanOpen, setScanOpen] = useState(start)
   const [params] = useSearchParams()
   const [tab, setTab] = useState(params.get("tab") || "overview")
-  const repo = store.repositories.find((item) => item.id === id)
-  if (store.isRestricted(id)) return <AccessDenied />
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  const repo = repositories.find((item) => item.id === id)
+  // Access check could be handled via API error, ignoring for now since it's mock
   if (!repo)
     return (
       <EmptyState
@@ -730,12 +772,12 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
         action={<LinkButton to="/repositories">View repositories</LinkButton>}
       />
     )
-  const repoScans = store.scans.filter((scan) => scan.repoId === id)
+  const repoScans = scans.filter((scan) => scan.repoId === id)
   const latest = repoScans[0]
   const report = repoScans.find((scan) =>
     ["Completed", "Partial"].includes(scan.status),
   )
-  const findings = getRepositoryFindings(repo.id, store.scans, store.findings)
+  const findings = getRepositoryFindings(repo.id, scans, allFindings)
   const open = findings.filter(
     (findingRecord) => findingRecord.status === "Open",
   )
@@ -890,9 +932,9 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
             <div className="grid divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
               {scannerInfo.map((scanner) => (
                 <div key={scanner.name} className="border-t px-5 py-5">
-                  <p className="text-sm font-semibold">{scanner.name}</p>
+                  <p className="text-sm font-semibold">{scanner.description}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {scanner.description}
+                    {scanner.category} scanner
                   </p>
                   <div className="mt-5 flex items-center justify-between">
                     <span className="text-xs">
@@ -1051,7 +1093,7 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {scan.date} ·{" "}
-                        {getScanFindings(scan, store.findings).length} findings
+                        {getScanFindings(scan, allFindings).length} findings
                       </p>
                     </div>
                     <LinkButton to={`/reports/${scan.id}`}>

@@ -1,0 +1,860 @@
+[
+  {
+    "file": "app\\auth.tsx",
+    "line": 88,
+    "type": "onClick",
+    "handler": "() => signIn(true)"
+  },
+  {
+    "file": "app\\auth.tsx",
+    "line": 130,
+    "type": "onClick",
+    "handler": "() => setForgot(true)"
+  },
+  {
+    "file": "app\\auth.tsx",
+    "line": 152,
+    "type": "onClick",
+    "handler": "() => setShow((current) => !current)"
+  },
+  {
+    "file": "app\\auth.tsx",
+    "line": 204,
+    "type": "onClick",
+    "handler": "() => signIn(true)"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 117,
+    "type": "to",
+    "handler": "to"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 417,
+    "type": "to",
+    "handler": "\"/dashboard\">Back to dashboard</LinkButton>"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 441,
+    "type": "onClick",
+    "handler": "() => setParams({"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 452,
+    "type": "to",
+    "handler": "\"/dashboard\">Back to dashboard</LinkButton>"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 462,
+    "type": "onClick",
+    "handler": "() => setParams({"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 470,
+    "type": "to",
+    "handler": "\"/dashboard\">Back to dashboard</LinkButton>"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 480,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 623,
+    "type": "to",
+    "handler": "`/repositories/${repo.id"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 658,
+    "type": "to",
+    "handler": "`/repositories/${repo.id"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 699,
+    "type": "to",
+    "handler": "`/repositories/${repo.id"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 822,
+    "type": "to",
+    "handler": "\"/settings?tab=github\">"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 833,
+    "type": "onClick",
+    "handler": "() => onOpenChange(false)"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 925,
+    "type": "onClick",
+    "handler": "() => setOpen(true)"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 946,
+    "type": "onClick",
+    "handler": "() => setOpen(false)"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 949,
+    "type": "onClick",
+    "handler": "download"
+  },
+  {
+    "file": "app\\components.tsx",
+    "line": 973,
+    "type": "to",
+    "handler": "item.to"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 63,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 164,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 169,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 248,
+    "type": "to",
+    "handler": "\"/findings\""
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 261,
+    "type": "to",
+    "handler": "\"/scans\""
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 272,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 312,
+    "type": "to",
+    "handler": "\"/findings\" variant=\"ghost\" className=\"h-7 text-xs\">"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 345,
+    "type": "to",
+    "handler": "`/scans/${scan?.id || \"12\""
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 375,
+    "type": "to",
+    "handler": "`/scans/${scan?.id || \"12\""
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 397,
+    "type": "to",
+    "handler": "`/scans/${scan?.id"
+  },
+  {
+    "file": "app\\dashboard.tsx",
+    "line": 426,
+    "type": "to",
+    "handler": "\"/repositories\""
+  },
+  {
+    "file": "app\\error.tsx",
+    "line": 11,
+    "type": "to",
+    "handler": "\"/dashboard\">Return to dashboard</LinkButton>"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 233,
+    "type": "onClick",
+    "handler": "() => setFiltersOpen(true)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 244,
+    "type": "onClick",
+    "handler": "clear"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 287,
+    "type": "to",
+    "handler": "findingPath(findingRecord)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 322,
+    "type": "to",
+    "handler": "findingPath(findingRecord)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 347,
+    "type": "onClick",
+    "handler": "clear"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 352,
+    "type": "to",
+    "handler": "scanId === \"all\" ? \"/repositories\" : `/reports/${scanId"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 363,
+    "type": "to",
+    "handler": "findingPath(findingRecord)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 401,
+    "type": "onClick",
+    "handler": "clear"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 403,
+    "type": "to",
+    "handler": "\"/repositories\">View repositories</LinkButton>"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 421,
+    "type": "onClick",
+    "handler": "() => setPage((current) => current - 1)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 433,
+    "type": "onClick",
+    "handler": "() => setPage((current) => current + 1)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 525,
+    "type": "onClick",
+    "handler": "clear"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 528,
+    "type": "onClick",
+    "handler": "() => setFiltersOpen(false)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 571,
+    "type": "to",
+    "handler": "\"/scans\">Back to scans</LinkButton>"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 640,
+    "type": "to",
+    "handler": "`/reports/${scan.id"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 670,
+    "type": "onClick",
+    "handler": "() => jump(section)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 792,
+    "type": "onClick",
+    "handler": "() => setContextIndex(index)"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 848,
+    "type": "onClick",
+    "handler": "() => jump(\"evidence\")"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 1105,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\findings.tsx",
+    "line": 1169,
+    "type": "onClick",
+    "handler": "() => setStatusOpen(false)"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 100,
+    "type": "to",
+    "handler": "`/reports/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 123,
+    "type": "to",
+    "handler": "`/reports/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 152,
+    "type": "to",
+    "handler": "\"/repositories\">"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 196,
+    "type": "to",
+    "handler": "\"/reports\">View reports</LinkButton>"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 217,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 220,
+    "type": "onClick",
+    "handler": "retry"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 248,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 250,
+    "type": "onClick",
+    "handler": "() => setParams({"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 263,
+    "type": "to",
+    "handler": "`/repositories/${repo.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 286,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 376,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 401,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 421,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 453,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\reports.tsx",
+    "line": 483,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 91,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 121,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 142,
+    "type": "onClick",
+    "handler": "() => setFilter(item)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 235,
+    "type": "onClick",
+    "handler": "() => setMore(repo)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 312,
+    "type": "to",
+    "handler": "`/repositories/${more?.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 322,
+    "type": "to",
+    "handler": "`/reports/${scans.find((scanRecord) => scanRecord.repoId === more?.id && scanRecord.status === \"Completed\")?.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 497,
+    "type": "onClick",
+    "handler": "validate"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 500,
+    "type": "onClick",
+    "handler": "() => setState(\"idle\")"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 610,
+    "type": "onClick",
+    "handler": "() => setGithub(true)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 730,
+    "type": "to",
+    "handler": "\"/repositories\">View repositories</LinkButton>"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 759,
+    "type": "onClick",
+    "handler": "() => report && navigate(`/reports/${report.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 763,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 788,
+    "type": "href",
+    "handler": "repo.url || `https://github.com/${repo.name"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 864,
+    "type": "to",
+    "handler": "`/scans/${latest.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 876,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 957,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 970,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 990,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 1002,
+    "type": "to",
+    "handler": "`/scans/${finding.scanId || report?.id || latest?.id"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 1028,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\repositories.tsx",
+    "line": 1057,
+    "type": "to",
+    "handler": "`/reports/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 90,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 157,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 204,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 213,
+    "type": "to",
+    "handler": "`/reports/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 280,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 294,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 340,
+    "type": "to",
+    "handler": "\"/scans\">View scan history</LinkButton>"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 386,
+    "type": "to",
+    "handler": "`/scans/${scan.retryOf"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 445,
+    "type": "onClick",
+    "handler": "() => setScanOpen(true)"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 458,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 637,
+    "type": "onClick",
+    "handler": "retry"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 662,
+    "type": "onClick",
+    "handler": "retry"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 666,
+    "type": "to",
+    "handler": "`/repositories/${repo.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 688,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 691,
+    "type": "onClick",
+    "handler": "retry"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 789,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 904,
+    "type": "to",
+    "handler": "item.to"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 992,
+    "type": "onClick",
+    "handler": "retry"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 998,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\scans.tsx",
+    "line": 1020,
+    "type": "to",
+    "handler": "`/scans/${item.id"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 275,
+    "type": "onClick",
+    "handler": "() => setSignout(true)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 295,
+    "type": "onClick",
+    "handler": "() => setPasswordOpen(true)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 351,
+    "type": "onClick",
+    "handler": "() => setPermissions(true)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 544,
+    "type": "to",
+    "handler": "\"/repositories/web-app\">"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 547,
+    "type": "to",
+    "handler": "\"/scans/12\">Test scan access</LinkButton>"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 548,
+    "type": "to",
+    "handler": "\"/reports/12\">Test report access</LinkButton>"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 565,
+    "type": "to",
+    "handler": "`${example.path"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 582,
+    "type": "onClick",
+    "handler": "() => setReset(true)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 601,
+    "type": "to",
+    "handler": "\"/settings\">Back to profile</LinkButton>"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 703,
+    "type": "onClick",
+    "handler": "() => setSignout(false)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 727,
+    "type": "onClick",
+    "handler": "() => setReset(false)"
+  },
+  {
+    "file": "app\\settings.tsx",
+    "line": 808,
+    "type": "to",
+    "handler": "\"/repositories/new\" variant=\"default\">"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 117,
+    "type": "to",
+    "handler": "`/login?redirect=${encodeURIComponent(location.pathname)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 150,
+    "type": "to",
+    "handler": "\"/dashboard\""
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 160,
+    "type": "onClick",
+    "handler": "() => setWorkspace(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 176,
+    "type": "to",
+    "handler": "item.path"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 198,
+    "type": "to",
+    "handler": "\"/settings\""
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 221,
+    "type": "to",
+    "handler": "\"/repositories/new\""
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 222,
+    "type": "onClick",
+    "handler": "() => setMobile(false)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 247,
+    "type": "to",
+    "handler": "\"/help\""
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 259,
+    "type": "onClick",
+    "handler": "() => setProfile(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 294,
+    "type": "onClick",
+    "handler": "() => setMobile(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 308,
+    "type": "onClick",
+    "handler": "() => setCommand(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 321,
+    "type": "onClick",
+    "handler": "() => setCommand(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 325,
+    "type": "to",
+    "handler": "\"/settings?tab=demo\">"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 341,
+    "type": "onClick",
+    "handler": "() => setTheme(isDark ? \"light\" : \"dark\")"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 389,
+    "type": "to",
+    "handler": "`/scans/${securityAlert.scanId"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 390,
+    "type": "onClick",
+    "handler": "() => setNotifications(false)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 430,
+    "type": "to",
+    "handler": "`/scans/${scan.id"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 431,
+    "type": "onClick",
+    "handler": "() => setNotifications(false)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 474,
+    "type": "onClick",
+    "handler": "() => setUnread(false)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 488,
+    "type": "onClick",
+    "handler": "() => setProfile(true)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 583,
+    "type": "to",
+    "handler": "\"/settings\""
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 584,
+    "type": "onClick",
+    "handler": "() => setProfile(false)"
+  },
+  {
+    "file": "app\\shell.tsx",
+    "line": 615,
+    "type": "to",
+    "handler": "\"/settings?tab=demo\">"
+  }
+]

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Link, useParams, useSearchParams } from "@/lib/router"
+import { Link, useParams } from "@/lib/router"
 import {
   ArrowRight,
   FileText,
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { categories, getScanFindings, scannerInfo, severityOrder } from "./data"
+import { categories, getScanFindings, scannerInfo, severityOrder } from "@/lib/security-model"
 import {
   Breadcrumbs,
   categoryIcons,
@@ -31,6 +31,7 @@ import {
   Notice,
   PageHeader,
   PageState,
+  ReportPreview,
   AccessDenied,
   Panel,
   PanelHeader,
@@ -40,10 +41,15 @@ import {
   SeverityDistribution,
   StatusBadge,
 } from "./components"
-import { useStore } from "./store"
+import { useRepositories, useScans, useFindings, useReport } from "@/lib/api/hooks"
 
 export function Reports() {
-  const { repositories, scans, findings } = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const findings = findingsData?.items || []
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("All reports")
   const list = scans.filter(
@@ -57,6 +63,20 @@ export function Reports() {
         (status === "Complete coverage" && scan.status === "Completed") ||
         (status === "Partial coverage" && scan.status === "Partial")),
   )
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PageState kind="Security reports">
       <PageHeader
@@ -180,14 +200,31 @@ export function Reports() {
 
 export function ReportDetail() {
   const { id } = useParams()
-  const store = useStore()
-  const [params, setParams] = useSearchParams()
-  const [retrying, setRetrying] = useState(false)
-  const scan = store.scans.find((scanRecord) => scanRecord.id === id)
-  const repo = store.repositories.find(
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
+  const { data: report } = useReport(id || "")
+  const scan = scans.find((scanRecord) => scanRecord.id === id)
+  const repo = repositories.find(
     (repositoryRecord) => repositoryRecord.id === scan?.repoId,
   )
-  if (store.isRestricted(undefined, id)) return <AccessDenied />
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
   if (!scan || !repo)
     return (
       <EmptyState
@@ -196,16 +233,8 @@ export function ReportDetail() {
         action={<LinkButton to="/reports">View reports</LinkButton>}
       />
     )
-  const findings = getScanFindings(scan, store.findings)
-  const state = params.get("state")
-  function retry() {
-    setRetrying(true)
-    setTimeout(() => {
-      setRetrying(false)
-      setParams({})
-    }, 1200)
-  }
-  if (state === "report-error")
+  const findings = getScanFindings(scan, allFindings)
+  if (report?.status === "failed")
     return (
       <>
         <PageHeader title="Security report" />
@@ -217,9 +246,7 @@ export function ReportDetail() {
               <LinkButton to={`/scans/${scan.id}`}>
                 View scan results
               </LinkButton>
-              <Button variant="outline" onClick={retry} disabled={retrying}>
-                {retrying ? "Retrying…" : "Retry report generation"}
-              </Button>
+              <DownloadReport scanId={scan.id} />
             </div>
           }
         >
@@ -228,15 +255,11 @@ export function ReportDetail() {
         </Notice>
       </>
     )
-  if (
-    state === "generating" ||
-    retrying ||
-    ["Running", "Queued"].includes(scan.status)
-  )
+  if (report?.status === "generating" || ["Running", "Queued"].includes(scan.status))
     return (
       <>
         <PageHeader
-          title="Generating report…"
+          title="Generating PDF…"
           description="Scanner results remain available while the report is prepared."
         />
         <div role="status" className="space-y-5">
@@ -246,11 +269,6 @@ export function ReportDetail() {
         </div>
         <div className="mt-5 flex gap-2">
           <LinkButton to={`/scans/${scan.id}`}>View scan progress</LinkButton>
-          {state === "generating" && (
-            <Button onClick={() => setParams({})}>
-              Complete demo generation
-            </Button>
-          )}
         </div>
       </>
     )
@@ -298,7 +316,7 @@ export function ReportDetail() {
             </Heading>
             <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
               <GitBranch className="size-3" />
-              {repo.branch}
+              {scan.branch || repo.branch}
               <span>·</span>
               <span className="font-mono">{scan.commit || repo.commit}</span>
               <span>·</span>Security analysis snapshot
@@ -328,6 +346,7 @@ export function ReportDetail() {
           </div>
         </div>
       </Panel>
+      <ReportPreview reportId={scan.id} enabled={report?.status === "ready"} />
       {scan.status === "Partial" && (
         <div className="mt-5">
           <Notice title="Incomplete scanner coverage" tone="warning">
@@ -523,7 +542,7 @@ export function ReportDetail() {
               {scannerInfo.map((scanner) => (
                 <div key={scanner.name}>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium">{scanner.name}</p>
+                    <p className="text-xs font-medium">{scanner.description}</p>
                     <StatusBadge
                       status={
                         scan.status === "Partial" && scanner.name === "Checkov"
@@ -533,7 +552,7 @@ export function ReportDetail() {
                     />
                   </div>
                   <p className="mt-1 font-mono text-xs text-muted-foreground">
-                    v{scanner.version} · {scanner.description}
+                    {scanner.category} scanner
                   </p>
                 </div>
               ))}
@@ -545,7 +564,7 @@ export function ReportDetail() {
               {[
                 ["Scan ID", `#${scan.id}`],
                 ["Duration", scan.duration],
-                ["Default branch", repo.branch],
+                ["Scanned branch", scan.branch || repo.branch],
                 ["Commit", scan.commit || repo.commit],
                 ["Primary language", repo.language],
                 ["Visibility", repo.visibility],

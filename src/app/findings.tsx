@@ -42,9 +42,15 @@ import {
   getScanFindings,
   getWorkspaceFindings,
   getFindingContext,
+  scannerInfo,
   severityOrder,
   type FindingStatus,
-} from "./data"
+} from "@/lib/security-model"
+
+// Map tool name → human-readable method description
+const scannerLabel: Record<string, string> = Object.fromEntries(
+  scannerInfo.map((s) => [s.name, s.description]),
+)
 import {
   Breadcrumbs,
   CodeBlock,
@@ -63,7 +69,7 @@ import {
   SeverityBadge,
   StatusBadge,
 } from "./components"
-import { useStore } from "./store"
+import { useRepositories, useScans, useFindings, useUpdateFinding } from "@/lib/api/hooks"
 
 export function WorkspaceFindings() {
   return (
@@ -79,16 +85,21 @@ export function WorkspaceFindings() {
 }
 
 export function FindingsList({ scanId }: { scanId: string }) {
-  const store = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
   const [params] = useSearchParams()
-  const scan = store.scans.find((scanRecord) => scanRecord.id === scanId)
+  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
   const [search, setSearch] = useState("")
   const [severity, setSeverity] = useState("All severities")
   const [category, setCategory] = useState(
     params.get("category") || "All categories",
   )
   const [scanner, setScanner] = useState(
-    params.get("scanner") || "All scanners",
+    params.get("scanner") || "All methods",
   )
   const [status, setStatus] = useState("All statuses")
   const [confidence, setConfidence] = useState("All confidence")
@@ -98,8 +109,8 @@ export function FindingsList({ scanId }: { scanId: string }) {
   const [multi, setMulti] = useState<string[]>([])
   const all =
     scanId === "all"
-      ? getWorkspaceFindings(store.scans, store.findings)
-      : getScanFindings(scan, store.findings)
+      ? getWorkspaceFindings(scans, allFindings)
+      : getScanFindings(scan, allFindings)
   const filtered = all
     .filter(
       (findingRecord) =>
@@ -110,7 +121,9 @@ export function FindingsList({ scanId }: { scanId: string }) {
           findingRecord.severity === severity) &&
         (category === "All categories" ||
           findingRecord.category === category) &&
-        (scanner === "All scanners" || findingRecord.scanner === scanner) &&
+        (scanner === "All methods" ||
+          // scanner state holds a description; find the matching tool name
+          (scannerLabel[findingRecord.scanner] ?? findingRecord.scanner) === scanner) &&
         (status === "All statuses" || findingRecord.status === status) &&
         (confidence === "All confidence" ||
           findingRecord.confidence === confidence) &&
@@ -133,7 +146,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
     setPage(1)
   }, [search, severity, category, scanner, status, confidence, sort, multi])
   function findingPath(finding: typeof all[number]) {
-    const latest = store.scans.find(
+    const latest = scans.find(
       (item) =>
         item.repoId === finding.repoId &&
         ["Completed", "Partial"].includes(item.status),
@@ -145,7 +158,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
   function capturedAt(repoId: string) {
     const capture =
       scan ||
-      store.scans.find(
+      scans.find(
         (item) =>
           item.repoId === repoId &&
           ["Completed", "Partial"].includes(item.status),
@@ -175,6 +188,19 @@ export function FindingsList({ scanId }: { scanId: string }) {
     setConfidence("All confidence")
     setMulti([])
   }
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PageState kind="Findings">
       <div className="mb-5 flex items-center justify-between">
@@ -292,7 +318,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
                   {scanId === "all" && (
                     <p className="mt-1 text-xs font-medium text-muted-foreground">
                       {
-                        store.repositories.find(
+                        repositories.find(
                           (repo) => repo.id === findingRecord.repoId,
                         )?.name
                       }
@@ -312,7 +338,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
                   <Confidence value={findingRecord.confidence} />
                 </TableCell>
                 <TableCell>
-                  <p className="text-xs">{findingRecord.scanner}</p>
+                  <p className="text-xs">{scannerLabel[findingRecord.scanner] ?? findingRecord.scanner}</p>
                   <div className="mt-1.5">
                     <StatusBadge status={findingRecord.status} />
                   </div>
@@ -377,7 +403,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
                 <div className="mt-4 flex justify-between">
                   <Confidence value={findingRecord.confidence} />
                   <span className="text-xs text-muted-foreground">
-                    {findingRecord.scanner}
+                    {scannerLabel[findingRecord.scanner] ?? findingRecord.scanner}
                   </span>
                 </div>
               </div>
@@ -479,15 +505,12 @@ export function FindingsList({ scanId }: { scanId: string }) {
                   options: ["All categories", ...categories],
                 },
                 {
-                  label: "Scanner",
+                  label: "Method",
                   value: scanner,
                   set: setScanner,
                   options: [
-                    "All scanners",
-                    "Semgrep",
-                    "Gitleaks",
-                    "Trivy",
-                    "Checkov",
+                    "All methods",
+                    ...scannerInfo.map((s) => s.description),
                   ],
                 },
                 {
@@ -537,7 +560,13 @@ export function FindingsList({ scanId }: { scanId: string }) {
 
 export function FindingDetail() {
   const { id: scanId, findingId } = useParams()
-  const store = useStore()
+  const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
+  const { data: scansData, isLoading: sLoading } = useScans(1, 100)
+  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
+  const { mutateAsync: updateFinding } = useUpdateFinding()
   const [params] = useSearchParams()
   const [statusOpen, setStatusOpen] = useState(false)
   const [selectedStatus, setSelectedStatus] =
@@ -547,20 +576,32 @@ export function FindingDetail() {
   const [aiLoading, setAiLoading] = useState(false)
   const [activeSection, setActiveSection] = useState("evidence")
   const [contextIndex, setContextIndex] = useState(0)
-  const scan = store.scans.find((scanRecord) => scanRecord.id === scanId)
-  const finding = getScanFindings(scan, store.findings).find(
+  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
+  const finding = getScanFindings(scan, allFindings).find(
     (findingRecord) =>
       findingRecord.id === findingId && findingRecord.repoId === scan?.repoId,
   )
-  const repo = store.repositories.find(
+  const repo = repositories.find(
     (repositoryRecord) => repositoryRecord.id === scan?.repoId,
   )
-  if (store.isRestricted(undefined, scanId)) return <AccessDenied />
+
+  if (rLoading || sLoading || fLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
   if (
     !finding ||
     !repo ||
     !scan ||
-    !getScanFindings(scan, store.findings).some(
+    !getScanFindings(scan, allFindings).some(
       (item) => item.id === finding.id,
     )
   )
@@ -571,7 +612,7 @@ export function FindingDetail() {
         action={<LinkButton to="/scans">Back to scans</LinkButton>}
       />
     )
-  const related = getScanFindings(scan, store.findings)
+  const related = getScanFindings(scan, allFindings)
     .filter(
       (findingRecord) =>
         findingRecord.id !== finding.id &&
@@ -1174,8 +1215,11 @@ export function FindingDetail() {
                 ["Resolved", "False positive"].includes(selectedStatus) &&
                 !reason.trim()
               }
-              onClick={() => {
-                store.setFindingStatus(finding.id, selectedStatus, reason)
+              onClick={async () => {
+                await updateFinding({
+                  id: finding.id,
+                  body: { status: selectedStatus, review_note: reason },
+                })
                 setStatusOpen(false)
                 setReason("")
               }}

@@ -1,0 +1,54 @@
+Software Architecture Guide
+1. How the architecture is arranged
+The diagram is split into 5 areas:
+External Services: GitHub and the vulnerability database.
+User/Application Layer: the user, frontend, and backend API.
+Application Infrastructure: PostgreSQL, authentication/access control, and the scan queue.
+Isolated Scan Environment: the worker, temporary repository workspace, four scanners, and the finding normalizer.
+Output: the security report shown to the user.
+2. Components
+User. The person using the application. They submit a repository and review the scan results.
+Frontend. The web interface. It accepts the repository URL, shows scan progress, and displays findings and the final report. It does not perform the security scan itself.
+Backend API. The main application service. It handles authentication, repository validation, scan creation, scan status, findings, reports, and communication with the database and queue.
+Authentication / Access Control. Handles login and checks whether a user is allowed to access a repository, scan, or report.
+PostgreSQL. The main persistent database. It stores users, repositories, scans, normalized findings, reports, and related metadata.
+Scan Queue. Holds scan jobs until a worker can process them. This keeps long-running scans out of normal API requests.
+Scan Worker. The background process that performs the scan. It takes a job from the queue, retrieves the repository, prepares the workspace, runs the scanners, collects the results, and updates the scan.
+Repository Workspace. A temporary working directory containing the repository being analyzed. It should be cleaned up after the scan.
+Secret Scanner. Looks for exposed credentials and secrets such as API keys, tokens, passwords, and private keys. Gitleaks is a possible implementation.
+Code Scanner. Checks source code for insecure patterns such as SQL injection or dangerous command execution. Semgrep is a possible implementation.
+Dependency Scanner. Checks dependency files and package versions against known vulnerabilities. OSV is a possible vulnerability source.
+Configuration Scanner. Checks configuration files and project settings for unsafe values, such as debug settings or exposed configuration.
+Finding Normalizer. Converts results from the different scanners into one common finding format so the rest of the application does not need to understand four different output formats.
+Vulnerability Database. An external source of vulnerability and advisory information used by the dependency scanner.
+GitHub. The repository source. The scan worker retrieves the repository contents from GitHub.
+Security Report. The user-facing result of a scan. It summarizes the repository, scan status, severity levels, findings, evidence, and recommendations.
+3. Connections in the diagram
+User → Frontend: Submit GitHub Repository URL
+Frontend → Backend API: Send Repository / Scan Request
+Backend API → Frontend: Return Scan Status / Findings
+Frontend → Security Report: Display Security Report
+Backend API → PostgreSQL: Store Scan / Repository Metadata
+PostgreSQL → Backend API: Retrieve Scan Results
+Backend API → Authentication / Access Control: Authenticate / Authorize
+Backend API → Scan Queue: Queue Scan Job
+Scan Queue → Scan Worker: Dispatch Scan Job
+GitHub → Scan Worker: Retrieve Repository
+Scan Worker → Repository Workspace: Prepare Temporary Workspace
+Repository Workspace → Secret Scanner: Analyze for Secrets
+Repository Workspace → Code Scanner: Analyze Source Code
+Repository Workspace → Dependency Scanner: Analyze Dependencies
+Repository Workspace → Configuration Scanner: Check Configuration
+Vulnerability Database → Dependency Scanner: Query Vulnerabilities / Advisories
+Secret Scanner → Finding Normalizer: Raw Findings
+Code Scanner → Finding Normalizer: Raw Findings
+Dependency Scanner → Finding Normalizer: Raw Findings
+Configuration Scanner → Finding Normalizer: Raw Findings
+Finding Normalizer → PostgreSQL: Store Normalized Findings
+4. Why the scanners run separately
+The four scanners are independent checks, so they run in parallel rather than forming a chain. A repository can therefore be checked for secrets, code issues, dependency problems, and configuration problems without one scanner depending on the output of another. It also makes it easier to replace or add a scanner later.
+5. Why scanning is isolated
+A repository submitted by a user should be treated as untrusted input. The worker and scanning tools therefore sit inside a separate scan environment. In the actual implementation, this can be enforced with containers, temporary storage, resource limits, controlled networking where practical, and cleanup after each scan.
+The isolation is a security boundary in the design. The dashed box in the diagram represents that boundary.
+6. Why there is a queue and worker
+Security scans can take much longer than a normal API request. The backend creates the job and places it in the queue instead of waiting for the scan to finish. The worker picks up the job and does the heavy work in the background. This keeps the frontend and API responsive while a scan is running.

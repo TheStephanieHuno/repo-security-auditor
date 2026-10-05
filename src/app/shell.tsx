@@ -45,8 +45,8 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { EmptyState, LinkButton, SearchInput, ScanDialog } from "./components"
-import { getWorkspaceFindings } from "./data"
-import { useStore } from "./store"
+import { getWorkspaceFindings } from "@/lib/security-model"
+import { useSession, useLogout, useRepositories, useScans, useFindings } from "@/lib/api/hooks"
 
 const navigation = [
   { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -86,7 +86,17 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 export function Shell({ children }: { children?: React.ReactNode } = {}) {
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
-  const store = useStore()
+  
+  const { data: session, isLoading: isSessionLoading } = useSession()
+  const { data: reposData } = useRepositories(1, 100)
+  const { data: scansData } = useScans(1, 100)
+  const { data: findingsData } = useFindings({ page_size: 100 })
+  const { mutateAsync: logout } = useLogout()
+
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const findings = findingsData?.items || []
+
   const location = useLocation()
   const navigate = useNavigate()
   const [mobile, setMobile] = useState(false)
@@ -111,7 +121,21 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
     document.addEventListener("keydown", shortcut)
     return () => document.removeEventListener("keydown", shortcut)
   }, [])
-  if (!store.authenticated)
+
+  if (isSessionLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin text-muted-foreground">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session?.authenticated)
     return (
       <Navigate
         to={`/login?redirect=${encodeURIComponent(location.pathname)}`}
@@ -129,15 +153,15 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
           : location.pathname.startsWith("/help")
             ? "Documentation"
             : "Dashboard"
-  const resultRepos = store.repositories
+  const resultRepos = repositories
     .filter((repo) => repo.name.toLowerCase().includes(search.toLowerCase()))
     .slice(0, 4)
-  const resultFindings = getWorkspaceFindings(store.scans, store.findings)
+  const resultFindings = getWorkspaceFindings(scans, findings)
     .filter((finding) =>
       finding.title.toLowerCase().includes(search.toLowerCase()),
     )
     .slice(0, 4)
-  const securityAlert = getWorkspaceFindings(store.scans, store.findings).find(
+  const securityAlert = getWorkspaceFindings(scans, findings).find(
     (finding) =>
       finding.severity === "Critical" &&
       finding.status === "Open" &&
@@ -187,7 +211,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
               {item.name}
               {item.name === "Repositories" && (
                 <span className="ml-auto rounded border border-current/10 px-1.5 text-xs opacity-70">
-                  {store.repositories.length}
+                  {repositories.length}
                 </span>
               )}
             </NavLink>
@@ -233,7 +257,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
               className="h-9 w-full justify-start gap-2.5 px-2 text-xs font-normal text-trust hover:bg-trust-soft hover:text-trust"
               onClick={() => {
                 setMobile(false)
-                if (!store.repositories.length) navigate("/repositories/new")
+                if (!repositories.length) navigate("/repositories/new")
                 else setQuickScan(true)
               }}
             >
@@ -259,18 +283,18 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
           onClick={() => setProfile(true)}
         >
           <span className="flex size-8 items-center justify-center rounded-full border bg-background text-xs font-medium">
-            {store.profile.name
-              .split(" ")
+            {session.name
+              ?.split(" ")
               .map((part) => part[0])
               .slice(0, 2)
-              .join("")}
+              .join("") || "U"}
           </span>
           <span className="text-left">
             <span className="block text-xs font-medium">
-              {store.profile.name}
+              {session.name}
             </span>
             <span className="block text-xs font-normal text-muted-foreground">
-              {store.role}
+              Account
             </span>
           </span>
           <ChevronDown className="ml-auto size-3.5 text-muted-foreground" />
@@ -405,14 +429,14 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {
-                              store.scans.find(
+                              scans.find(
                                 (scan) => scan.id === securityAlert.scanId,
                               )?.relative
                             }
                           </p>
                         </Link>
                       )}
-                      {store.scans.slice(0, 3).map((scan) => {
+                      {scans.slice(0, 3).map((scan) => {
                         const completed = scan.status === "Completed"
                         const failed =
                           scan.status === "Failed" || scan.status === "Partial"
@@ -421,7 +445,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
                           : failed
                             ? TriangleAlert
                             : Activity
-                        const repository = store.repositories.find(
+                        const repository = repositories.find(
                           (repo) => repo.id === scan.repoId,
                         )
                         return (
@@ -460,7 +484,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
                           </Link>
                         )
                       })}
-                      {!store.scans.length && (
+                      {!scans.length && (
                         <p className="py-6 text-center text-xs text-muted-foreground">
                           No alerts yet. Start a scan to see activity here.
                         </p>
@@ -487,11 +511,11 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
               aria-label="Open user menu"
               onClick={() => setProfile(true)}
             >
-              {store.profile.name
-                .split(" ")
+              {session.name
+                ?.split(" ")
                 .map((part) => part[0])
                 .slice(0, 2)
-                .join("")}
+                .join("") || "U"}
             </Button>
           </div>
         </header>
@@ -500,7 +524,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
         </main>
       </div>
       <ScanDialog
-        key={store.repositories.map((repository) => repository.id).join("|")}
+        key={repositories.map((repository) => repository.id).join("|")}
         open={quickScan}
         onOpenChange={setQuickScan}
       />
@@ -550,7 +574,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
                 variant="ghost"
                 className="h-10 w-full justify-start"
                 onClick={() => {
-                  const scan = store.scans.find(
+                  const scan = scans.find(
                     (scanRecord) => scanRecord.id === finding.scanId,
                   )
                   navigate(`/scans/${scan?.id || "8"}/findings/${finding.id}`)
@@ -574,9 +598,9 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
       <Dialog open={profile} onOpenChange={setProfile}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{store.profile.name}</DialogTitle>
+            <DialogTitle>{session.name}</DialogTitle>
             <DialogDescription>
-              {store.profile.email} · {store.role}
+              {session.email}
             </DialogDescription>
           </DialogHeader>
           <Link
@@ -592,8 +616,8 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
           </Link>
           <Button
             variant="outline"
-            onClick={() => {
-              store.logout()
+            onClick={async () => {
+              await logout()
               setProfile(false)
               navigate("/login")
             }}

@@ -1,7 +1,7 @@
 export type Severity = "Critical" | "High" | "Medium" | "Low"
 export type Category = "Code" | "Secrets" | "Dependencies" | "Configuration"
 export type FindingStatus = "Open" | "Reviewed" | "Resolved" | "False positive"
-export type ScanStatus = "Completed" | "Partial" | "Failed" | "Running" | "Queued"
+export type ScanStatus = "Completed" | "Partial" | "Failed" | "Running" | "Queued" | "Cancelled"
 export type DemoOutcome = "Completed" | "Partial" | "Failed" | "No findings"
 export type Repository = {
   id: string
@@ -34,6 +34,8 @@ export type Scan = {
   findingsSnapshot?: Finding[]
   startedAt?: string
   completedAt?: string
+  branch?: string
+  errorReason?: string
 }
 export type Finding = {
   id: string

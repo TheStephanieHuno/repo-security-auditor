@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { ThemeProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
-import { StoreProvider } from "@/app/store"
+import { Providers } from "@/lib/api/QueryProvider"
 import "@/index.css"
 
 export const metadata: Metadata = {
@@ -28,14 +28,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <StoreProvider>
+          <Providers>
             {children}
             <Toaster
               position="bottom-right"
               closeButton
               toastOptions={{ className: "font-sans text-sm" }}
             />
-          </StoreProvider>
+          </Providers>
         </ThemeProvider>
       </body>
     </html>

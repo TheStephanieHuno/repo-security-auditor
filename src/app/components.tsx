@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode, type ComponentType } from "react"
+import { useEffect, useState, type ReactNode, type ComponentType } from "react"
 import { Link, useNavigate, useSearchParams } from "@/lib/router"
 import {
   ArrowRight,
@@ -46,16 +46,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import {
   categories,
-  getRepositoryFindings,
   type DemoOutcome,
   severityOrder,
   type Category,
   type Finding,
   type Repository,
   type Severity,
-} from "./data"
-import { useStore } from "./store"
-import { renderReport } from "./report-export"
+} from "@/lib/security-model"
+import { useRepositories, useTriggerScan, useGitHubStatus, useRepositoryBranches, useScans, useFindings, useCancelScan } from "@/lib/api/hooks"
+import { useDownloadReportPdf, useGenerateReport, useReport } from "@/lib/api/hooks"
+import { getScanOutcome, scanOutcomeLabels } from "@/lib/scan-status"
 
 export const severityStyles: Record<Severity, string> = {
   Critical: "bg-critical-soft text-critical",
@@ -209,6 +209,8 @@ export function SeverityBadge({ severity }: { severity: Severity }) {
   )
 }
 export function StatusBadge({ status }: { status: string }) {
+  const scanStatuses = ["Completed", "Partial", "Failed", "Running", "Queued", "Cancelled"]
+  const displayStatus = scanStatuses.includes(status) ? scanOutcomeLabels[getScanOutcome({ status })] : status
   const success = ["Completed", "Reviewed", "Resolved", "Connected"].includes(
     status,
   )
@@ -221,7 +223,7 @@ export function StatusBadge({ status }: { status: string }) {
           ? "text-trust"
           : warning
             ? "text-medium"
-            : status === "Failed"
+          : status === "Failed"
               ? "text-critical"
               : "text-muted-foreground",
       )}
@@ -235,7 +237,7 @@ export function StatusBadge({ status }: { status: string }) {
       ) : (
         <Circle className="size-3" />
       )}
-      {status === "Partial" ? "Partially completed" : status}
+      {displayStatus}
     </span>
   )
 }
@@ -342,6 +344,19 @@ export function SelectControl({
         </Select.Positioner>
       </Select.Portal>
     </Select.Root>
+  )
+}
+
+export function BranchSelect({ repoId, value, onChange }: { repoId: string; value: string; onChange: (value: string) => void }) {
+  const { data, isLoading, isError, refetch } = useRepositoryBranches(repoId)
+  const branches = data ?? []
+  return (
+    <div className="space-y-2">
+      <label htmlFor="scan-branch" className="text-xs font-medium">Branch</label>
+      <Input id="scan-branch" list="repository-branches" value={value} disabled={isLoading || isError || branches.length <= 1} onChange={(event) => onChange(event.target.value)} placeholder={isLoading ? "Loading branches…" : "Search branches"} aria-describedby="branch-help" />
+      <datalist id="repository-branches">{branches.map((branch) => <option key={branch.name} value={branch.name}>{branch.is_default ? "Default" : ""}</option>)}</datalist>
+      <p id="branch-help" className="text-xs text-muted-foreground">{isLoading ? "Loading available branches…" : isError ? <><span>Branches could not be loaded. </span><button type="button" className="underline" onClick={() => refetch()}>Retry</button></> : branches.length <= 1 ? "This repository has only one branch." : "Search and select the branch to scan."}</p>
+    </div>
   )
 }
 export function Notice({
@@ -635,13 +650,16 @@ export function RepoIdentity({
   )
 }
 export function RepositoryCard({ repo }: { repo: Repository }) {
-  const { findings, scans } = useStore()
-  const list = getRepositoryFindings(repo.id, scans, findings).filter(
+  const { data: scansData } = useScans(1, 100, repo.id)
+  const { data: findingsData } = useFindings({ repo_id: repo.id, page_size: 1000 })
+  const scans = scansData?.items || []
+  const findings = findingsData?.items || []
+  const latest = scans.find((scan) => ["Completed", "Partial"].includes(scan.status))
+  const list = findings.filter(
     (findingRecord) =>
       findingRecord.status !== "Resolved" &&
       findingRecord.status !== "False positive",
   )
-  const latest = scans.find((scan) => scan.repoId === repo.id)
   const highest = severityOrder.find((severity) =>
     list.some((finding) => finding.severity === severity),
   )
@@ -714,23 +732,33 @@ export function RepositoryCard({ repo }: { repo: Repository }) {
 
 export function ScanDialog({
   repo,
+  initialBranch,
   open,
   onOpenChange,
 }: {
   repo?: Repository
+  initialBranch?: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const store = useStore()
   const navigate = useNavigate()
+  const { data: reposData } = useRepositories(1, 100)
+  const repositories = reposData?.items || []
+  const { data: isGitHubConnected } = useGitHubStatus()
+  const { mutateAsync: triggerScan } = useTriggerScan()
+  
   const [selected, setSelected] = useState(
-    repo?.id || store.repositories[0]?.id || "",
+    repo?.id || repositories[0]?.id || "",
   )
+  const activeRepo = repo || repositories.find((item) => item.id === selected)
+  const { data: branches } = useRepositoryBranches(activeRepo?.id || "")
+  const [branch, setBranch] = useState(initialBranch || "")
+  const defaultBranch = branches?.find((item) => item.is_default)?.name || activeRepo?.branch || ""
+  useEffect(() => { if (defaultBranch && (!branch || !branches?.some((item) => item.name === branch))) setBranch(initialBranch || defaultBranch) }, [defaultBranch, initialBranch, branch, branches])
   const [params] = useSearchParams()
   const [error, setError] = useState(false)
   const [githubError, setGithubError] = useState(false)
   const [launching, setLaunching] = useState(false)
-  const [outcome, setOutcome] = useState<DemoOutcome>("Completed")
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -744,23 +772,6 @@ export function ScanDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-3">
-          <details className="rounded-lg border p-3 text-xs">
-            <summary className="cursor-pointer font-medium">
-              Frontend demo outcome
-            </summary>
-            <div className="mt-3 space-y-2">
-              <SelectControl
-                label="Simulated scan result"
-                value={outcome}
-                onChange={(value) => setOutcome(value as DemoOutcome)}
-                options={["Completed", "Partial", "Failed", "No findings"]}
-              />
-              <p className="text-muted-foreground">
-                Uses fictional fixtures. No repository is fetched and no scanner
-                or AI service runs.
-              </p>
-            </div>
-          </details>
           <div>
             <p className="mb-2 text-xs font-medium">Repository</p>
             {repo ? (
@@ -772,18 +783,11 @@ export function ScanDialog({
                 label="Repository to scan"
                 value={selected}
                 onChange={setSelected}
-                options={store.repositories.map((item) => item.id)}
+                options={repositories.map((item) => item.id)}
               />
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <GitBranch className="size-4" />
-            Branch{" "}
-            <span className="font-mono text-foreground">
-              {(repo || store.repositories.find((item) => item.id === selected))
-                ?.branch || "main"}
-            </span>
-          </div>
+          <BranchSelect repoId={activeRepo?.id || ""} value={branch || defaultBranch} onChange={setBranch} />
           <div className="grid grid-cols-2 gap-3">
             {categories.map((category) => {
               const Icon = categoryIcons[category]
@@ -835,11 +839,8 @@ export function ScanDialog({
           </Button>
           <Button
             disabled={launching || (!repo && !selected)}
-            onClick={() => {
-              if (
-                typeof window !== "undefined" &&
-                localStorage.getItem("rsa-github") === "false"
-              ) {
+            onClick={async () => {
+              if (isGitHubConnected?.connected === false) {
                 setGithubError(true)
                 return
               }
@@ -849,26 +850,23 @@ export function ScanDialog({
                 return
               }
               setLaunching(true)
-              setTimeout(() => {
-                try {
-                  const id = store.startScan(repo?.id || selected, outcome)
-                  onOpenChange(false)
-                  setLaunching(false)
-                  navigate(`/scans/${id}`)
-                  toast.success("Security scan queued", {
-                    description:
-                      "Demo scan · no external services are contacted.",
-                  })
-                } catch (failure) {
-                  toast.error(
-                    failure instanceof Error
-                      ? failure.message
-                      : "Could not create the demo scan. Existing results remain available.",
-                  )
-                } finally {
-                  setLaunching(false)
-                }
-              }, 450)
+              try {
+                if (!branch) throw new Error("Select a branch before starting the scan.")
+                const scan = await triggerScan({ repo_id: repo?.id || selected, branch })
+                onOpenChange(false)
+                setLaunching(false)
+                navigate(`/scans/${scan.id}`)
+                toast.success("Security scan queued", {
+                  description: "Scan started.",
+                })
+              } catch (failure) {
+                toast.error(
+                  failure instanceof Error
+                    ? failure.message
+                    : "Could not create the scan. Existing results remain available.",
+                )
+                setLaunching(false)
+              }
             }}
           >
             {launching ? (
@@ -890,71 +888,44 @@ export function DownloadReport({
   scanId: string
   variant?: "default" | "outline" | "ghost"
 }) {
-  const { scans, repositories, findings } = useStore()
-  const [open, setOpen] = useState(false)
-  const [format, setFormat] = useState("Markdown (.md)")
-  const scan = scans.find((item) => item.id === scanId)
-  const repo = repositories.find((item) => item.id === scan?.repoId)
-  function download() {
-    if (!scan || !repo) return
-    const content = renderReport(
-      repo,
-      scan,
-      findings,
-      format.startsWith("JSON"),
-    )
-    const blob = new Blob([content], {
-      type: format.startsWith("JSON") ? "application/json" : "text/markdown",
-    })
-    const url = URL.createObjectURL(blob)
-    const element = document.createElement("a")
-    element.href = url
-    element.download = `security-report-${repo.id}-${scanId}.${
-      format.startsWith("JSON") ? "json" : "md"
-    }`
-    element.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setOpen(false)
-    toast.success("Report downloaded")
-  }
+  const { mutateAsync: generate } = useGenerateReport()
+  const { mutateAsync: downloadPdf, isPending } = useDownloadReportPdf()
+  const { data: existing } = useReport(scanId)
+  async function download() { try { const report = existing?.status === "ready" ? existing : await generate({ scan_id: scanId }); const blob = await downloadPdf(report.id); const url = URL.createObjectURL(blob); const element = document.createElement("a"); element.href = url; element.download = report.file_name; element.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast.success("PDF report downloaded") } catch (error) { toast.error(error instanceof Error ? error.message : "Could not download the PDF.") } }
   return (
     <>
       <Button
         variant={variant}
         className="h-9 gap-2"
-        onClick={() => setOpen(true)}
+        onClick={download}
+        disabled={isPending}
       >
-        <Download className="size-3.5" />
-        Download report
+        {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+        Download PDF
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export security report</DialogTitle>
-            <DialogDescription>
-              Includes scanner evidence, confidence, and labeled AI-assisted
-              guidance.
-            </DialogDescription>
-          </DialogHeader>
-          <SelectControl
-            label="Report format"
-            value={format}
-            onChange={setFormat}
-            options={["Markdown (.md)", "JSON (.json)"]}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={download}>
-              <Download className="size-4" />
-              Download
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
+}
+
+export function CancelScanDialog({ scanId, open, onOpenChange }: { scanId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { mutateAsync: cancel, isPending } = useCancelScan()
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cancel this scan?</DialogTitle><DialogDescription>Results found so far will not be saved.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={isPending} onClick={() => onOpenChange(false)}>Keep scanning</Button><Button variant="destructive" disabled={isPending} onClick={async () => { try { await cancel(scanId); toast.success("Scan cancelled") ; onOpenChange(false) } catch (error) { toast.error(error instanceof Error ? error.message : "Could not cancel scan.") } }}>{isPending ? "Cancelling…" : "Cancel scan"}</Button></DialogFooter></DialogContent></Dialog>
+}
+
+export function ReportPreview({ reportId, enabled }: { reportId: string; enabled: boolean }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const { mutateAsync: download, isPending } = useDownloadReportPdf()
+  useEffect(() => {
+    if (!enabled) return
+    let active = true
+    download(reportId).then((blob) => { if (active) setUrl(URL.createObjectURL(blob)) }).catch(() => { if (active) setError("Preview unavailable. Download the PDF instead.") })
+    return () => { active = false; setUrl((current) => { if (current) URL.revokeObjectURL(current); return null }) }
+  }, [download, enabled, reportId])
+  if (!enabled) return null
+  if (error) return <Notice tone="warning">{error}</Notice>
+  if (isPending || !url) return <div className="rounded-lg border p-6 text-sm text-muted-foreground">Loading PDF preview…</div>
+  return <iframe title="Security report PDF preview" src={url} className="mt-5 h-[720px] w-full rounded-lg border" />
 }
 export function Breadcrumbs({
   items,
