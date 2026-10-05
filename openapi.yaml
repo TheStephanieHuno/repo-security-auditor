@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Repo Security Auditor API
   version: 1.0.0
-  description: REST API for repository security auditing, scanning, finding review, and PDF report generation.
+  description: AI-assisted security analysis platform. Deterministic scanning identifies evidence; LLM assists with interpretation.
 servers:
   - url: http://localhost:8000/api
     description: Local Development
@@ -24,9 +24,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    UserRole:
+      type: string
+      enum: [developer, security_analyst, administrator]
+      example: developer
     User:
       type: object
-      required: [id, name, email, createdAt, updatedAt]
+      required: [id, name, email, role, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -38,6 +42,8 @@ components:
           type: string
           format: email
           example: alex@example.com
+        role:
+          $ref: '#/components/schemas/UserRole'
         createdAt:
           type: string
           format: date-time
@@ -362,16 +368,20 @@ components:
           format: uuid
         branch:
           type: string
-          example: develop
+          example: main
     Severity:
       type: string
       enum: [critical, high, medium, low, info]
+    Confidence:
+      type: string
+      enum: [high, medium, low]
+      example: high
     ReviewStatus:
       type: string
       enum: [open, acknowledged, false_positive, resolved]
     Finding:
       type: object
-      required: [id, scanId, repositoryId, severity, category, title, description, filePath, recommendation, reviewStatus, createdAt]
+      required: [id, scanId, repositoryId, severity, confidence, category, title, description, filePath, recommendation, reviewStatus, createdAt]
       properties:
         id:
           type: string
@@ -384,6 +394,8 @@ components:
           format: uuid
         severity:
           $ref: '#/components/schemas/Severity'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         category:
           type: string
           example: Secret Exposure
@@ -707,7 +719,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Request password reset
-      description: Always returns neutral message regardless of email existence.
+      description: Neutral response regardless of email existence.
       security: []
       requestBody:
         required: true
@@ -870,7 +882,7 @@ paths:
   /repositories/validate:
     post:
       tags: [Repositories]
-      summary: Check repository
+      summary: Check repository via GitHub API
       security:
         - BearerAuth: []
       requestBody:
@@ -926,7 +938,7 @@ paths:
   /repositories/{id}/branches:
     get:
       tags: [Repositories]
-      summary: Branch list
+      summary: Branch list from GitHub API
       security:
         - BearerAuth: []
       parameters:
@@ -938,7 +950,7 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Branches with default marker and optional commit
+          description: Branches
           content:
             application/json:
               schema:
@@ -975,7 +987,6 @@ paths:
     post:
       tags: [Scans]
       summary: Start scan
-      description: Also used for Rescan of failed, cancelled, or completed scans.
       security:
         - BearerAuth: []
       requestBody:
@@ -1053,7 +1064,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScanResponse'
         '422':
-          description: Scan not in cancellable state
+          description: Not cancellable
   /scans/{id}/findings:
     get:
       tags: [Scans]
@@ -1068,6 +1079,10 @@ paths:
             type: string
             format: uuid
         - name: severity
+          in: query
+          schema:
+            type: string
+        - name: confidence
           in: query
           schema:
             type: string
@@ -1120,6 +1135,10 @@ paths:
             type: string
             format: uuid
         - name: severity
+          in: query
+          schema:
+            type: string
+        - name: confidence
           in: query
           schema:
             type: string
@@ -1206,7 +1225,6 @@ paths:
     post:
       tags: [Reports]
       summary: Generate report
-      description: Starts or repeats PDF generation for a completed scan.
       security:
         - BearerAuth: []
       requestBody:
@@ -1237,7 +1255,7 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Report status and details
+          description: Report status
           content:
             application/json:
               schema:
@@ -1245,8 +1263,7 @@ paths:
   /reports/{id}/pdf:
     get:
       tags: [Reports]
-      summary: Download report
-      description: Returns PDF for preview or download.
+      summary: Download report PDF
       security:
         - BearerAuth: []
       parameters:
@@ -1267,7 +1284,7 @@ paths:
   /dashboard/metrics:
     get:
       tags: [Dashboard]
-      summary: Dashboard
+      summary: Dashboard metrics
       security:
         - BearerAuth: []
       responses:
