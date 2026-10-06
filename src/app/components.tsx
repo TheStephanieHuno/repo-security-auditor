@@ -851,8 +851,9 @@ export function ScanDialog({
               }
               setLaunching(true)
               try {
-                if (!branch) throw new Error("Select a branch before starting the scan.")
-                const scan = await triggerScan({ repo_id: repo?.id || selected, branch })
+                const branchToScan = branch || defaultBranch;
+                if (!branchToScan) throw new Error("Select a branch before starting the scan.")
+                const scan = await triggerScan({ repo_id: repo?.id || selected, branch: branchToScan })
                 onOpenChange(false)
                 setLaunching(false)
                 navigate(`/scans/${scan.id}`)

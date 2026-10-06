@@ -38,15 +38,27 @@ function toTitleCase(str?: string) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
+function computeRelative(dateStr?: string) {
+  if (!dateStr) return "—"
+  const ms = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 1) return "Just now"
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`
+  const days = Math.floor(hours / 24)
+  return `${days} day${days > 1 ? "s" : ""} ago`
+}
+
 function mapRepo(r: any): Repository {
   return {
     id: r.id,
     name: r.name,
     description: "",
-    language: "Unknown",
-    branch: r.defaultBranch || "main",
-    commit: "HEAD",
-    visibility: "Private",
+    language: "—",
+    branch: r.defaultBranch || "—",
+    commit: "—",
+    visibility: "—",
     connected: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "",
     owner: r.owner,
     url: r.url,
@@ -59,7 +71,7 @@ function mapScan(s: any): Scan {
     repoId: s.repositoryId,
     status: toTitleCase(s.status) as any,
     date: s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "",
-    relative: s.startedAt ? "Recently" : "Queued",
+    relative: computeRelative(s.startedAt),
     duration: "—",
     progress: s.progress ?? 0,
     stage: s.progress ? Math.floor(s.progress / 10) : 0,
@@ -78,9 +90,9 @@ function mapFinding(f: any): Finding {
     severity: toTitleCase(f.severity) as any,
     category: f.category || "Code",
     confidence: toTitleCase(f.confidence) as any || "Medium",
-    file: f.filePath || "unknown",
+    file: f.filePath || "—",
     line: f.lineStart || 1,
-    scanner: "Analyzer",
+    scanner: "—",
     rule: f.title,
     description: f.description || "",
     evidence: f.codeSnippet || "",
@@ -240,10 +252,9 @@ export const api = {
 
   triggerScan: (body: ScanTrigger): Promise<Scan> => {
     if (isLive) {
-      // branch is REQUIRED by the backend; fall back to "main" if the UI omits it
       return apiClient.post<any>(endpoints.scans.trigger, {
         repositoryId: body.repo_id,
-        branch: body.branch || "main",
+        branch: body.branch,
       }).then(mapScan)
     }
     return mock.mockTriggerScan(body)
