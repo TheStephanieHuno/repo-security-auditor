@@ -3,6 +3,19 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local databases (created at runtime; contain user accounts and scan data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
 
 # Environment variables
 .env
