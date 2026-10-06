@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath, PureWindowsPath
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
@@ -48,6 +49,14 @@ _SEVERITY_MAP: dict[str, dict[str, Severity]] = {
         "CRITICAL": Severity.CRITICAL,
     },
     "CHECKOV": {value: Severity(value) for value in ("LOW", "MEDIUM", "HIGH", "CRITICAL")},
+    "OSV": {
+        "LOW": Severity.LOW,
+        "MODERATE": Severity.MEDIUM,
+        "MEDIUM": Severity.MEDIUM,
+        "HIGH": Severity.HIGH,
+        "CRITICAL": Severity.CRITICAL,
+    },
+    "CONFIG": {value: Severity(value) for value in ("LOW", "MEDIUM", "HIGH", "CRITICAL")},
 }
 
 
@@ -184,8 +193,16 @@ async def persist_normalized_findings(
     scanner_run: ScannerRun,
     findings: list[NormalizedFinding],
 ) -> list[Finding]:
+    existing = await db.execute(
+        select(Finding.fingerprint).where(Finding.scanner_run_id == scanner_run.id)
+    )
+    existing_fingerprints = set(existing.scalars().all())
+
+    # Build every row before adding any, so a validation error leaves no partial findings.
     persisted: list[Finding] = []
     for normalized in collapse_duplicates(findings):
+        if normalized.fingerprint in existing_fingerprints:
+            continue
         safe_path = normalize_repository_path(normalized.file_path)
         finding = Finding(
             scanner_run_id=scanner_run.id,
@@ -219,9 +236,9 @@ async def persist_normalized_findings(
                     ),
                 )
             )
-        db.add(finding)
         persisted.append(finding)
+    db.add_all(persisted)
     await db.flush()
-    scanner_run.finding_count = len(persisted)
+    scanner_run.finding_count = len(existing_fingerprints) + len(persisted)
     await db.flush()
     return persisted

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from enum import StrEnum
 
@@ -11,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +35,7 @@ class ScanStatus(StrEnum):
     COMPLETED = "COMPLETED"
     PARTIAL = "PARTIAL"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class ScannerName(StrEnum):
@@ -40,6 +43,8 @@ class ScannerName(StrEnum):
     GITLEAKS = "GITLEAKS"
     TRIVY = "TRIVY"
     CHECKOV = "CHECKOV"
+    OSV = "OSV"
+    CONFIG = "CONFIG"
 
 
 class ScannerRunStatus(StrEnum):
@@ -48,6 +53,7 @@ class ScannerRunStatus(StrEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     TIMEOUT = "TIMEOUT"
+    CANCELLED = "CANCELLED"
 
 
 class FindingCategory(StrEnum):
@@ -72,8 +78,9 @@ class Confidence(StrEnum):
 
 class FindingReviewStatus(StrEnum):
     OPEN = "OPEN"
-    CONFIRMED = "CONFIRMED"
-    DISMISSED = "DISMISSED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    RESOLVED = "RESOLVED"
 
 
 class EvidenceType(StrEnum):
@@ -107,6 +114,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, default=uuid.uuid4, unique=True, index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -134,6 +144,9 @@ class Repository(Base):
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, default=uuid.uuid4, unique=True, index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     github_url: Mapped[str] = mapped_column(String(1024), nullable=False)
     owner_id: Mapped[int] = mapped_column(
@@ -162,6 +175,9 @@ class Scan(Base):
     __tablename__ = "scans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, default=uuid.uuid4, unique=True, index=True, nullable=False
+    )
     repository_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -174,6 +190,7 @@ class Scan(Base):
     queued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -191,7 +208,7 @@ class Scan(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED')",
+            "status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED')",
             name="ck_scans_status",
         ),
     )
@@ -227,11 +244,11 @@ class ScannerRun(Base):
     __table_args__ = (
         UniqueConstraint("scan_id", "scanner_name", name="uq_scanner_runs_scan_scanner"),
         CheckConstraint(
-            "scanner_name IN ('SEMGREP', 'GITLEAKS', 'TRIVY', 'CHECKOV')",
+            "scanner_name IN ('SEMGREP', 'GITLEAKS', 'TRIVY', 'CHECKOV', 'OSV', 'CONFIG')",
             name="ck_scanner_runs_scanner_name",
         ),
         CheckConstraint(
-            "status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'TIMEOUT')",
+            "status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED')",
             name="ck_scanner_runs_status",
         ),
         CheckConstraint("attempt_count >= 0", name="ck_scanner_runs_attempt_count"),
@@ -243,6 +260,9 @@ class Finding(Base):
     __tablename__ = "findings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, default=uuid.uuid4, unique=True, index=True, nullable=False
+    )
     scanner_run_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("scanner_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -260,6 +280,11 @@ class Finding(Base):
     review_status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=FindingReviewStatus.OPEN.value, index=True
     )
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
@@ -288,7 +313,7 @@ class Finding(Base):
             name="ck_findings_confidence",
         ),
         CheckConstraint(
-            "review_status IN ('OPEN', 'CONFIRMED', 'DISMISSED')",
+            "review_status IN ('OPEN', 'ACKNOWLEDGED', 'FALSE_POSITIVE', 'RESOLVED')",
             name="ck_findings_review_status",
         ),
         CheckConstraint(
@@ -341,6 +366,9 @@ class Report(Base):
     __tablename__ = "reports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, default=uuid.uuid4, unique=True, index=True, nullable=False
+    )
     scan_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, unique=True
     )
@@ -414,3 +442,13 @@ class FindingExplanation(Base):
             name="ck_finding_explanations_status",
         ),
     )
+
+
+class RevokedToken(Base):
+    """Denylist of signed-out JWT IDs; rows can be purged once expired."""
+
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

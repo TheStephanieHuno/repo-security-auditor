@@ -126,7 +126,7 @@ async def test_statistics_are_scoped_to_one_user(db: AsyncSession) -> None:
                 confidence="HIGH",
                 recommendation="Fix it",
                 fingerprint="code-1",
-                review_status=FindingReviewStatus.CONFIRMED.value,
+                review_status=FindingReviewStatus.ACKNOWLEDGED.value,
             ),
         ]
     )
