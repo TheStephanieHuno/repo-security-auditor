@@ -14,6 +14,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), default="developer")  # developer, security_analyst, administrator
     on_scan_completion: Mapped[bool] = mapped_column(Boolean, default=True)
     on_scan_failure: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -69,6 +70,7 @@ class Finding(Base):
     scan_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("scans.id"), nullable=False, index=True)
     repository_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("repositories.id"), nullable=False, index=True)
     severity: Mapped[str] = mapped_column(String(50), index=True)  # critical, high, medium, low, info
+    confidence: Mapped[str] = mapped_column(String(50), default="high", index=True)  # high, medium, low
     category: Mapped[str] = mapped_column(String(255), index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
