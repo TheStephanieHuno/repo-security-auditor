@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.schemas.generated import (
+from backend_app_test.schemas.generated import (
     DashboardResponse,
     DashboardMetrics,
     FindingsCount,

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, status, Query
-from app.schemas.generated import (
+from backend_app_test.schemas.generated import (
     Scan,
     ScanResponse,
     ScanListResponse,
@@ -12,6 +12,7 @@ from app.schemas.generated import (
     Finding,
     FindingListResponse,
     Severity,
+    Confidence,
     ReviewStatus,
     Pagination,
 )
@@ -94,6 +95,7 @@ async def cancel_scan(id: uuid.UUID):
 async def get_scan_findings(
     id: uuid.UUID,
     severity: str | None = None,
+    confidence: str | None = None,
     reviewStatus: str | None = None,
     page: int = Query(1, ge=1),
     pageSize: int = Query(20, ge=1, le=100),
@@ -103,6 +105,7 @@ async def get_scan_findings(
         scanId=id,
         repositoryId=uuid.uuid4(),
         severity=Severity.high,
+        confidence=Confidence.high,
         category="Secret Exposure",
         title="Hardcoded AWS Key",
         description="An AWS access key was detected in code configuration.",

@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Repository, Scan, Finding, Report, User
+from backend_app_test.db.models import Repository, Scan, Finding, Report, User  # <-- Updated import
 
 async def verify_user_owns_repository(db: AsyncSession, repo_id: uuid.UUID, user: User) -> Repository:
     """Ensures the repository exists and belongs to the authenticated user (FR-10)."""

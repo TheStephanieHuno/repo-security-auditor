@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, Integer, Text, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.db.session import Base
+from backend_app_test.db.session import Base  # <-- Updated import namespace
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)

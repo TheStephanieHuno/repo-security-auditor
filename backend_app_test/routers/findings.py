@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Query
-from app.schemas.generated import (
+from backend_app_test.schemas.generated import (
     Finding,
     FindingResponse,
     FindingListResponse,
     ReviewFindingRequest,
     Severity,
+    Confidence,
     ReviewStatus,
     Pagination,
 )
@@ -18,6 +19,7 @@ SAMPLE_FINDING = Finding(
     scanId=uuid.uuid4(),
     repositoryId=uuid.uuid4(),
     severity=Severity.critical,
+    confidence=Confidence.high,
     category="Dependency Vulnerability",
     title="SQL Injection in Auth Pipeline",
     description="Raw string concatenation in SQL execution.",
@@ -41,6 +43,7 @@ async def list_findings(
     repositoryId: uuid.UUID | None = None,
     scanId: uuid.UUID | None = None,
     severity: str | None = None,
+    confidence: str | None = None,
     reviewStatus: str | None = None,
 ):
     return FindingListResponse(

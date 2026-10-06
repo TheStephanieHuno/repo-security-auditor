@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, status
-from app.schemas.generated import (
+from backend_app_test.schemas.generated import (
     GitHubResponse,
     GitHubIntegration,
 )

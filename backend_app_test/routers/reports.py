@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Response, Query, status
-from app.schemas.generated import (
+from backend_app_test.schemas.generated import (
     Report,
     ReportResponse,
     ReportListResponse,
