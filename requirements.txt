@@ -1,10 +1,41 @@
-fastapi
-uvicorn[standard]
-sqlalchemy[asyncio]
-aiosqlite
-asyncpg
-alembic
-pydantic[email]
-pytest
-pytest-asyncio
-httpx
+# Production dependencies, pinned to the versions validated by the test suite
+# and the live-server security run (2026-10-06). Install test tools with
+# `pip install -r requirements-dev.txt`.
+#
+# Scanner binaries are installed separately on the worker host and found on
+# PATH (or via GITLEAKS_PATH / SEMGREP_PATH / GIT_PATH):
+#   gitleaks >= 8.19 (validated with 8.30.1)
+#   semgrep  >= 1.100 (validated with 1.179.0)
+#   git      >= 2.30
+
+# Web framework and server
+fastapi==0.142.2
+starlette==1.7.0
+uvicorn[standard]==0.54.0
+
+# Persistence
+SQLAlchemy[asyncio]==2.1.3
+greenlet==3.5.6
+alembic==1.20.0
+asyncpg==0.31.0
+aiosqlite==0.22.1
+
+# Validation
+pydantic==2.13.5
+email-validator==2.3.0
+
+# Authentication
+bcrypt==5.0.0
+PyJWT==2.15.1
+
+# Outbound HTTP (OSV API, GitHub API)
+httpx==0.28.1
+
+# AI explanations (Claude)
+anthropic==1.11.0
+
+# Reports
+reportlab==5.0.1
+
+# Rule loading
+PyYAML==6.0.3
