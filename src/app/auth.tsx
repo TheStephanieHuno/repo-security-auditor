@@ -212,6 +212,41 @@ export function Login() {
             Open demo workspace
             <ArrowRight className="size-4" />
           </Button>}
+          <Button
+            variant="outline"
+            disabled={isPending}
+            className="mt-4 h-11 w-full"
+            onClick={() => {
+              navigate(
+                `/signup${
+                  params.get("redirect")
+                    ? `?redirect=${encodeURIComponent(params.get("redirect")!)}`
+                    : ""
+                }`
+              )
+            }}
+          >
+            <Github className="size-4" />
+            Sign up with GitHub
+          </Button>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Don't have an account?{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() =>
+                navigate(
+                  `/signup${
+                    params.get("redirect")
+                      ? `?redirect=${encodeURIComponent(params.get("redirect")!)}`
+                      : ""
+                  }`
+                )
+              }
+            >
+              Sign up
+            </button>
+          </p>
         </div>
       </div>
       <Dialog open={forgot} onOpenChange={setForgot}>
@@ -288,7 +323,7 @@ export function SignUp() {
   const [params] = useSearchParams()
   const { mutateAsync: register, isPending } = useRegister()
   const { data: session, isPending: sessionLoading } = useSession()
-  const { register: field, handleSubmit, formState: { errors } } = useForm<SignUpValues>({ resolver: zodResolver(signUpSchema), defaultValues: { name: "", email: "", password: "", confirmPassword: "" } })
+  const { register: field, handleSubmit, setError, formState: { errors } } = useForm<SignUpValues>({ resolver: zodResolver(signUpSchema), defaultValues: { name: "", email: "", password: "", confirmPassword: "" } })
   const redirect = params.get("redirect")
   const safeRedirect = redirect?.startsWith("/") && !redirect.startsWith("//") ? redirect : "/dashboard"
   useEffect(() => {
@@ -297,7 +332,26 @@ export function SignUp() {
   if (sessionLoading || session) return null
   async function submit(values: SignUpValues) {
     try { await register({ name: values.name, email: values.email, password: values.password }); navigate(safeRedirect) }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Could not create your account.") }
+    catch (error) { 
+      if (error && typeof error === 'object' && 'details' in error && Array.isArray((error as any).details)) {
+        let hasFieldErrors = false;
+        (error as any).details.forEach((detail: any) => {
+          if (detail.field && detail.message) {
+            // Check if it's a valid field for this form before setting
+            if (['name', 'email', 'password'].includes(detail.field)) {
+              hasFieldErrors = true;
+              // @ts-ignore - hook form set error
+              setError(detail.field as any, { type: "manual", message: detail.message });
+            }
+          }
+        });
+        if (!hasFieldErrors) {
+          toast.error(error instanceof Error ? error.message : "Could not create your account.");
+        }
+      } else {
+        toast.error(error instanceof Error ? error.message : "Could not create your account.");
+      }
+    }
   }
   return <div className="flex min-h-screen items-center justify-center bg-background"><div className="w-full max-w-sm px-6 py-12"><div className="mb-10 text-center"><img src="/assets/48bdb.svg" alt="Repo Security Auditor" className="mx-auto mb-8 w-20" /><p className="mb-3 text-xs font-medium tracking-widest text-muted-foreground">GET STARTED</p><Heading>Create your workspace account</Heading><p className="mt-3 text-sm text-muted-foreground">Start reviewing your repositories with evidence-backed security scans.</p></div><form onSubmit={handleSubmit(submit)} className="space-y-4">
     {([['name', 'Full name', 'text'], ['email', 'Email address', 'email'], ['password', 'Password', 'password'], ['confirmPassword', 'Confirm password', 'password']] as const).map(([name, label, type]) => <div key={name}><label className="mb-2 block text-xs font-medium">{label}</label><Input type={type} {...field(name)} className="h-11" />{errors[name] && <p className="mt-1 text-xs text-critical">{errors[name]?.message}</p>}</div>)}

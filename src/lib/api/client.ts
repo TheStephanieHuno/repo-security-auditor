@@ -6,6 +6,16 @@ import { ApiError } from "./errors"
 
 const SKIP_AUTH_REDIRECT = ["/api/auth/login", "/api/auth/register", "/api/users/me"]
 
+let inMemoryToken: string | null = null
+
+export function setAuthToken(token: string | null) {
+  inMemoryToken = token
+}
+
+export function getAuthToken(): string | null {
+  return inMemoryToken
+}
+
 export interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown
   timeout?: number
@@ -21,16 +31,22 @@ async function request<T>(
   const controller = new AbortController()
   const timerId = setTimeout(() => controller.abort(), timeout)
 
+  const token = getAuthToken()
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(rest.headers as Record<string, string> ?? {}),
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
   let response: Response
   try {
     response = await fetch(`${baseUrl}${path}`, {
       ...rest,
-      credentials: "include",
+      credentials: "omit", // Using Authorization header instead of cookies
       signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...(rest.headers ?? {}),
-      },
+      headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
   } catch (err) {
@@ -59,19 +75,39 @@ async function request<T>(
     }
 
     let message = response.statusText
+    let details: any[] | undefined
     try {
       const errBody = await response.json()
-      message = errBody?.detail ?? errBody?.message ?? message
+      if (errBody?.error?.message) {
+        message = errBody.error.message
+        details = errBody.error.details
+      } else {
+        message = errBody?.detail ?? errBody?.message ?? message
+      }
     } catch {
       // ignore parse errors — use statusText
     }
-    throw new ApiError(response.status, response.statusText, message)
+    throw new ApiError(response.status, response.statusText, message, details)
   }
 
   // 204 No Content — return undefined cast to T
   if (response.status === 204) return undefined as T
 
-  return response.json() as Promise<T>
+  const parsed = await response.json()
+  
+  if (parsed && typeof parsed === "object" && "status" in parsed && parsed.status === "success") {
+    if ("pagination" in parsed) {
+       return {
+         items: parsed.data,
+         total: parsed.pagination.totalItems,
+         page: parsed.pagination.page,
+         page_size: parsed.pagination.pageSize
+       } as unknown as T
+    }
+    return parsed.data as T
+  }
+
+  return parsed as T
 }
 
 export const apiClient = {
@@ -101,7 +137,11 @@ export const apiClient = {
 
   getBlob: async (path: string, options?: Omit<RequestOptions, "method">) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
-    const response = await fetch(`${baseUrl}${path}`, { method: "GET", credentials: "include", headers: options?.headers as HeadersInit | undefined })
+    const token = getAuthToken()
+    const headers: Record<string, string> = { ...(options?.headers as Record<string, string> ?? {}) }
+    if (token) headers["Authorization"] = `Bearer ${token}`
+
+    const response = await fetch(`${baseUrl}${path}`, { method: "GET", credentials: "omit", headers })
     if (!response.ok) throw new ApiError(response.status, response.statusText, "Could not download the PDF.")
     return response.blob()
   },

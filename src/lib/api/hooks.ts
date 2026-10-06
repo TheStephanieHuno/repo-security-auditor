@@ -191,7 +191,8 @@ export function useScanStatus(id: string) {
       const data = query.state.data
       if (!data) return 2000 // Poll every 2s initially
       // Stop polling if completed or failed
-      if (["Completed", "Failed", "Partial", "Cancelled", "cancelled"].includes(data.status)) return false
+      const status = data.status.toLowerCase()
+      if (["completed", "failed", "partial", "cancelled"].includes(status)) return false
       return 2000
     },
     // When a scan completes, invalidate related data
