@@ -1,6 +1,16 @@
 import uuid
+import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend_app_test.db.session import get_db, AsyncSessionLocal
+from backend_app_test.core.dependencies import get_current_user
+from backend_app_test.db.models import Scan as DBScan, Repository as DBRepository, Finding as DBFinding, User as DBUser
+from backend_app_test.core.access import verify_user_owns_repository, verify_user_owns_scan
+from backend_app_test.workers.queue import get_redis_pool
+from backend_app_test.workers.scan_worker import process_scan_job
 from backend_app_test.schemas.generated import (
     Scan,
     ScanResponse,
@@ -17,79 +27,260 @@ from backend_app_test.schemas.generated import (
     Pagination,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scans", tags=["Scans"])
 
-SAMPLE_SCAN_ID = uuid.uuid4()
-SAMPLE_SCAN = Scan(
-    id=SAMPLE_SCAN_ID,
-    repositoryId=uuid.uuid4(),
-    branch="main",
-    status=ScanStatus.completed,
-    progress=100,
-    findingsCount=FindingsCount(critical=1, high=3, medium=5, low=2, info=0),
-    startedAt=datetime.now(timezone.utc),
-    completedAt=datetime.now(timezone.utc),
-    cancelledAt=None,
-    createdAt=datetime.now(timezone.utc),
-    updatedAt=datetime.now(timezone.utc),
-)
+
+def ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+async def run_in_process_fallback(scan_id_str: str, repo_url: str, branch: str, repo_id_str: str):
+    """Fallback runner if Redis queue is offline (runs in FastAPI background thread)."""
+    await process_scan_job({}, scan_id_str, repo_url, branch, repo_id_str)
+
 
 @router.get("", response_model=ScanListResponse)
 async def list_scans(
     page: int = Query(1, ge=1),
     pageSize: int = Query(20, ge=1, le=100),
     repositoryId: uuid.UUID | None = None,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
+    offset = (page - 1) * pageSize
+    query = (
+        select(DBScan)
+        .join(DBRepository, DBScan.repository_id == DBRepository.id)
+        .where(DBRepository.added_by == current_user.id)
+    )
+
+    if repositoryId:
+        query = query.where(DBScan.repository_id == repositoryId)
+
+    result = await db.execute(query.offset(offset).limit(pageSize).order_by(DBScan.created_at.desc()))
+    scans = result.scalars().all()
+
+    # Aggregate finding severity counts for each scan
+    scan_items = []
+    for s in scans:
+        findings_query = (
+            select(DBFinding.severity, func.count())
+            .where(DBFinding.scan_id == s.id)
+            .group_by(DBFinding.severity)
+        )
+        counts_res = (await db.execute(findings_query)).all()
+        counts_dict = {row[0]: row[1] for row in counts_res}
+
+        scan_items.append(
+            Scan(
+                id=s.id,
+                repositoryId=s.repository_id,
+                branch=s.branch,
+                status=ScanStatus(s.status),
+                progress=s.progress,
+                findingsCount=FindingsCount(
+                    critical=counts_dict.get("critical", 0),
+                    high=counts_dict.get("high", 0),
+                    medium=counts_dict.get("medium", 0),
+                    low=counts_dict.get("low", 0),
+                    info=counts_dict.get("info", 0),
+                ),
+                startedAt=ensure_utc(s.started_at),
+                completedAt=ensure_utc(s.completed_at),
+                cancelledAt=ensure_utc(s.cancelled_at),
+                createdAt=ensure_utc(s.created_at),
+                updatedAt=ensure_utc(s.updated_at),
+            )
+        )
+
+    count_query = (
+        select(func.count())
+        .select_from(DBScan)
+        .join(DBRepository, DBScan.repository_id == DBRepository.id)
+        .where(DBRepository.added_by == current_user.id)
+    )
+    total_items = (await db.execute(count_query)).scalar() or 0
+    total_pages = (total_items + pageSize - 1) // pageSize if total_items > 0 else 1
+
     return ScanListResponse(
         status="success",
-        data=[SAMPLE_SCAN],
-        pagination=Pagination(page=page, pageSize=pageSize, totalItems=1, totalPages=1),
+        data=scan_items,
+        pagination=Pagination(page=page, pageSize=pageSize, totalItems=total_items, totalPages=total_pages)
     )
+
 
 @router.post("", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
-async def start_scan(body: StartScanRequest):
-    new_scan = Scan(
+async def start_scan(
+    body: StartScanRequest,
+    background_tasks: BackgroundTasks,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Enforce repository ownership (FR-10)
+    repo = await verify_user_owns_repository(db, body.repositoryId, current_user)
+
+    # 2. Create scan in database with initial status 'queued'
+    now = datetime.now(timezone.utc)
+    new_scan = DBScan(
         id=uuid.uuid4(),
-        repositoryId=body.repositoryId,
+        repository_id=repo.id,
+        initiated_by=current_user.id,
         branch=body.branch,
-        status=ScanStatus.queued,
+        status="queued",
         progress=0,
-        findingsCount=FindingsCount(critical=0, high=0, medium=0, low=0, info=0),
-        startedAt=None,
-        completedAt=None,
-        cancelledAt=None,
-        createdAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+        started_at=None,
+        completed_at=None,
+        cancelled_at=None,
+        created_at=now,
+        updated_at=now
     )
-    return ScanResponse(status="success", data=new_scan)
+    db.add(new_scan)
+    await db.commit()
+    await db.refresh(new_scan)
+
+    # 3. Dispatch scan: Attempt Redis ARQ Queue first; fallback to BackgroundTasks
+    redis = await get_redis_pool()
+    if redis:
+        try:
+            await redis.enqueue_job(
+                "process_scan_job",
+                str(new_scan.id),
+                repo.url,
+                body.branch,
+                str(repo.id)
+            )
+            logger.info(f"Scan {new_scan.id} enqueued to Redis ARQ queue.")
+        except Exception as e:
+            logger.warning(f"Failed to enqueue to Redis ({e}). Falling back to BackgroundTasks.")
+            background_tasks.add_task(
+                run_in_process_fallback,
+                str(new_scan.id),
+                repo.url,
+                body.branch,
+                str(repo.id)
+            )
+    else:
+        background_tasks.add_task(
+            run_in_process_fallback,
+            str(new_scan.id),
+            repo.url,
+            body.branch,
+            str(repo.id)
+        )
+
+    return ScanResponse(
+        status="success",
+        data=Scan(
+            id=new_scan.id,
+            repositoryId=new_scan.repository_id,
+            branch=new_scan.branch,
+            status=ScanStatus.queued,
+            progress=0,
+            findingsCount=FindingsCount(),
+            startedAt=None,
+            completedAt=None,
+            cancelledAt=None,
+            createdAt=ensure_utc(new_scan.created_at),
+            updatedAt=ensure_utc(new_scan.updated_at)
+        )
+    )
+
 
 @router.get("/{id}", response_model=ScanResponse)
-async def get_scan(id: uuid.UUID):
-    return ScanResponse(status="success", data=SAMPLE_SCAN)
+async def get_scan(
+    id: uuid.UUID,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    scan = await verify_user_owns_scan(db, id, current_user)
+
+    findings_query = (
+        select(DBFinding.severity, func.count())
+        .where(DBFinding.scan_id == scan.id)
+        .group_by(DBFinding.severity)
+    )
+    counts_res = (await db.execute(findings_query)).all()
+    counts_dict = {row[0]: row[1] for row in counts_res}
+
+    return ScanResponse(
+        status="success",
+        data=Scan(
+            id=scan.id,
+            repositoryId=scan.repository_id,
+            branch=scan.branch,
+            status=ScanStatus(scan.status),
+            progress=scan.progress,
+            findingsCount=FindingsCount(
+                critical=counts_dict.get("critical", 0),
+                high=counts_dict.get("high", 0),
+                medium=counts_dict.get("medium", 0),
+                low=counts_dict.get("low", 0),
+                info=counts_dict.get("info", 0),
+            ),
+            startedAt=ensure_utc(scan.started_at),
+            completedAt=ensure_utc(scan.completed_at),
+            cancelledAt=ensure_utc(scan.cancelled_at),
+            createdAt=ensure_utc(scan.created_at),
+            updatedAt=ensure_utc(scan.updated_at)
+        )
+    )
+
 
 @router.get("/{id}/status", response_model=ScanProgressResponse)
-async def get_scan_status(id: uuid.UUID):
+async def get_scan_status(
+    id: uuid.UUID,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    scan = await verify_user_owns_scan(db, id, current_user)
     return ScanProgressResponse(
         status="success",
-        data={"id": id, "status": ScanStatus.running, "progress": 65},
+        data={"id": scan.id, "status": ScanStatus(scan.status), "progress": scan.progress}
     )
 
+
 @router.post("/{id}/cancel", response_model=ScanResponse)
-async def cancel_scan(id: uuid.UUID):
-    cancelled = Scan(
-        id=id,
-        repositoryId=uuid.uuid4(),
-        branch="main",
-        status=ScanStatus.cancelled,
-        progress=40,
-        findingsCount=FindingsCount(critical=0, high=0, medium=0, low=0, info=0),
-        startedAt=datetime.now(timezone.utc),
-        completedAt=None,
-        cancelledAt=datetime.now(timezone.utc),
-        createdAt=datetime.now(timezone.utc),
-        updatedAt=datetime.now(timezone.utc),
+async def cancel_scan(
+    id: uuid.UUID,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    scan = await verify_user_owns_scan(db, id, current_user)
+
+    # FR-05: Cancellation only permitted for queued or running scans
+    if scan.status not in ("queued", "running"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Scan cannot be cancelled in its current state."
+        )
+
+    scan.status = "cancelled"
+    scan.cancelled_at = datetime.now(timezone.utc)
+    scan.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return ScanResponse(
+        status="success",
+        data=Scan(
+            id=scan.id,
+            repositoryId=scan.repository_id,
+            branch=scan.branch,
+            status=ScanStatus.cancelled,
+            progress=scan.progress,
+            findingsCount=FindingsCount(),
+            startedAt=ensure_utc(scan.started_at),
+            completedAt=None,
+            cancelledAt=ensure_utc(scan.cancelled_at),
+            createdAt=ensure_utc(scan.created_at),
+            updatedAt=ensure_utc(scan.updated_at)
+        )
     )
-    return ScanResponse(status="success", data=cancelled)
+
 
 @router.get("/{id}/findings", response_model=FindingListResponse)
 async def get_scan_findings(
@@ -99,30 +290,55 @@ async def get_scan_findings(
     reviewStatus: str | None = None,
     page: int = Query(1, ge=1),
     pageSize: int = Query(20, ge=1, le=100),
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    mock_finding = Finding(
-        id=uuid.uuid4(),
-        scanId=id,
-        repositoryId=uuid.uuid4(),
-        severity=Severity.high,
-        confidence=Confidence.high,
-        category="Secret Exposure",
-        title="Hardcoded AWS Key",
-        description="An AWS access key was detected in code configuration.",
-        filePath="src/config.ts",
-        lineStart=14,
-        lineEnd=14,
-        codeSnippet="const AWS_KEY = 'AKIAIOSFODNN7EXAMPLE';",
-        recommendation="Rotate credentials and use environment variables.",
-        aiExplanation="Exposed in commit 7f3b4c1 in public config.",
-        reviewStatus=ReviewStatus.open,
-        reviewNote=None,
-        reviewedBy=None,
-        reviewedAt=None,
-        createdAt=datetime.now(timezone.utc),
-    )
+    await verify_user_owns_scan(db, id, current_user)
+
+    offset = (page - 1) * pageSize
+    query = select(DBFinding).where(DBFinding.scan_id == id)
+
+    if severity:
+        query = query.where(DBFinding.severity == severity.lower())
+    if confidence:
+        query = query.where(DBFinding.confidence == confidence.lower())
+    if reviewStatus:
+        query = query.where(DBFinding.review_status == reviewStatus.lower())
+
+    result = await db.execute(query.offset(offset).limit(pageSize))
+    findings = result.scalars().all()
+
+    data = [
+        Finding(
+            id=f.id,
+            scanId=f.scan_id,
+            repositoryId=f.repository_id,
+            severity=Severity(f.severity),
+            confidence=Confidence(f.confidence),
+            category=f.category,
+            title=f.title,
+            description=f.description,
+            filePath=f.file_path,
+            lineStart=f.line_start,
+            lineEnd=f.line_end,
+            codeSnippet=f.code_snippet,
+            recommendation=f.recommendation,
+            aiExplanation=f.ai_explanation,
+            reviewStatus=ReviewStatus(f.review_status),
+            reviewNote=f.review_note,
+            reviewedBy=f.reviewed_by,
+            reviewedAt=ensure_utc(f.reviewed_at),
+            createdAt=ensure_utc(f.created_at)
+        )
+        for f in findings
+    ]
+
+    count_query = select(func.count()).select_from(DBFinding).where(DBFinding.scan_id == id)
+    total_items = (await db.execute(count_query)).scalar() or 0
+    total_pages = (total_items + pageSize - 1) // pageSize if total_items > 0 else 1
+
     return FindingListResponse(
         status="success",
-        data=[mock_finding],
-        pagination=Pagination(page=page, pageSize=pageSize, totalItems=1, totalPages=1),
+        data=data,
+        pagination=Pagination(page=page, pageSize=pageSize, totalItems=total_items, totalPages=total_pages)
     )
