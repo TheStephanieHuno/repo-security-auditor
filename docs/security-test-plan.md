@@ -40,6 +40,7 @@ repository, so these tests check real scanner output, not hand-written JSON.
 | SEC-05 | Placeholders (`${VAR}`, `<password>`, `changeme`) | not reported | same (negative samples) |
 | SEC-06 | Upstream rules overlapping project rules | disabled, one finding per secret | `test_gitleaks_config_extends_defaults_without_duplicates` |
 | SEC-07 | Secret value never stored in Finding/Evidence | masked (`ghp_********` / `REDACTED`) | `test_gitleaks_normalization_masks_secrets`, `test_recorded_gitleaks_output_maps_to_expected_severities` |
+| SEC-08 | `# gitleaks:allow` comments or `.gitleaksignore` in the scanned repository | ignored, secret still reported | `test_real_gitleaks_ignores_repository_suppressions`, `test_wrapper_commands_are_hardened` |
 
 ### Code patterns (Semgrep, `app/scanners/rules/semgrep/`)
 
@@ -48,7 +49,7 @@ repository, so these tests check real scanner output, not hand-written JSON.
 | CODE-01 | eval/exec, shell=True, string-built SQL (Python, JS) | HIGH | `test_recorded_semgrep_output_maps_to_expected_severities` |
 | CODE-02 | os.system, pickle, unsafe YAML, disabled TLS, DOM XSS sinks, `new Function` | MEDIUM | same |
 | CODE-03 | Safe variants (literals, parameterized SQL, `yaml.safe_load`) | not reported | `test_semgrep_rule_unit_tests_pass` (`ok:` annotations) |
-| CODE-04 | `# nosemgrep` in scanned code | ignored (`--disable-nosem`) | `test_wrapper_commands_are_hardened` |
+| CODE-04 | `# nosemgrep` comments or `.semgrepignore` in the scanned repository | ignored (`--disable-nosem`, `--x-ignore-semgrepignore-files`) | `test_real_semgrep_ignores_repository_suppressions`, `test_wrapper_commands_are_hardened` |
 | CODE-05 | Snippet evidence present despite "requires login" | real source line | `test_semgrep_normalization_rule_ids_and_snippets`, `test_real_semgrep_scan` |
 
 ### Dependencies (OSV API)
