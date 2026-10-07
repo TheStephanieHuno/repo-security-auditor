@@ -1,0 +1,121 @@
+[
+  {
+    "RuleID": "rsa-database-url-password",
+    "Description": "Database connection string with an embedded password",
+    "StartLine": 1,
+    "EndLine": 1,
+    "StartColumn": 14,
+    "EndColumn": 64,
+    "Match": "postgresql://app:REDACTED@db.internal:5432/app",
+    "Secret": "REDACTED",
+    "File": ".env",
+    "Entropy": 3.0269868,
+    "Tags": [
+      "database",
+      "severity:high"
+    ],
+    "Fingerprint": ".env:rsa-database-url-password:1"
+  },
+  {
+    "RuleID": "rsa-database-url-password",
+    "Description": "Database connection string with an embedded password",
+    "StartLine": 1,
+    "EndLine": 1,
+    "StartColumn": 14,
+    "EndColumn": 64,
+    "Match": "postgresql://app:REDACTED@db.internal:5432/app",
+    "Secret": "REDACTED",
+    "File": "settings.env",
+    "Entropy": 3.0269868,
+    "Tags": [
+      "database",
+      "severity:high"
+    ],
+    "Fingerprint": "settings.env:rsa-database-url-password:1"
+  },
+  {
+    "RuleID": "rsa-private-key",
+    "Description": "Private key",
+    "StartLine": 1,
+    "EndLine": 5,
+    "StartColumn": 1,
+    "EndColumn": 30,
+    "Match": "REDACTED",
+    "Secret": "REDACTED",
+    "File": "id_rsa",
+    "Entropy": 5.099945,
+    "Tags": [
+      "private-key",
+      "severity:critical"
+    ],
+    "Fingerprint": "id_rsa:rsa-private-key:1"
+  },
+  {
+    "RuleID": "rsa-aws-secret-access-key",
+    "Description": "AWS secret access key",
+    "StartLine": 2,
+    "EndLine": 2,
+    "StartColumn": 2,
+    "EndColumn": 67,
+    "Match": "aws_secret_access_key = \"REDACTED\"",
+    "Secret": "REDACTED",
+    "File": "config.py",
+    "Entropy": 4.803056,
+    "Tags": [
+      "aws",
+      "severity:critical"
+    ],
+    "Fingerprint": "config.py:rsa-aws-secret-access-key:2"
+  },
+  {
+    "RuleID": "rsa-github-token",
+    "Description": "GitHub personal access, OAuth, app, or refresh token",
+    "StartLine": 3,
+    "EndLine": 3,
+    "StartColumn": 18,
+    "EndColumn": 57,
+    "Match": "REDACTED",
+    "Secret": "REDACTED",
+    "File": "config.py",
+    "Entropy": 5.0219283,
+    "Tags": [
+      "github",
+      "severity:critical"
+    ],
+    "Fingerprint": "config.py:rsa-github-token:3"
+  },
+  {
+    "RuleID": "rsa-aws-access-key-id",
+    "Description": "AWS access key ID",
+    "StartLine": 1,
+    "EndLine": 1,
+    "StartColumn": 22,
+    "EndColumn": 41,
+    "Match": "REDACTED",
+    "Secret": "REDACTED",
+    "File": "config.py",
+    "Entropy": 3.7841837,
+    "Tags": [
+      "aws",
+      "severity:critical"
+    ],
+    "Fingerprint": "config.py:rsa-aws-access-key-id:1"
+  },
+  {
+    "RuleID": "rsa-database-password-assignment",
+    "Description": "Hardcoded database password",
+    "StartLine": 4,
+    "EndLine": 4,
+    "StartColumn": 2,
+    "EndColumn": 29,
+    "Match": "DB_PASSWORD = \"REDACTED\"",
+    "Secret": "REDACTED",
+    "File": "config.py",
+    "Entropy": 3.4182959,
+    "Tags": [
+      "database",
+      "severity:high"
+    ],
+    "Fingerprint": "config.py:rsa-database-password-assignment:4"
+  }
+]

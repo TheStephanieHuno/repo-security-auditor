@@ -1,0 +1,673 @@
+{
+  "version": "1.179.0",
+  "results": [
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-eval-exec",
+      "path": "src\\app.py",
+      "start": {
+        "line": 13,
+        "col": 5,
+        "offset": 298
+      },
+      "end": {
+        "line": 13,
+        "col": 21,
+        "offset": 314
+      },
+      "extra": {
+        "message": "Dynamic code execution with eval()/exec() on a non-literal value lets attacker-controlled input run arbitrary Python code.",
+        "metadata": {
+          "title": "Dynamic code execution with eval or exec",
+          "cwe": [
+            "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Remove eval/exec. Parse data with json.loads or ast.literal_eval, or dispatch to an explicit allowlist of functions."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-eval-exec",
+      "path": "src\\app.py",
+      "start": {
+        "line": 15,
+        "col": 5,
+        "offset": 354
+      },
+      "end": {
+        "line": 15,
+        "col": 21,
+        "offset": 370
+      },
+      "extra": {
+        "message": "Dynamic code execution with eval()/exec() on a non-literal value lets attacker-controlled input run arbitrary Python code.",
+        "metadata": {
+          "title": "Dynamic code execution with eval or exec",
+          "cwe": [
+            "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Remove eval/exec. Parse data with json.loads or ast.literal_eval, or dispatch to an explicit allowlist of functions."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-subprocess-shell-true",
+      "path": "src\\app.py",
+      "start": {
+        "line": 20,
+        "col": 5,
+        "offset": 472
+      },
+      "end": {
+        "line": 20,
+        "col": 51,
+        "offset": 518
+      },
+      "extra": {
+        "message": "A subprocess is started with shell=True, so shell metacharacters in any interpolated value are executed as commands.",
+        "metadata": {
+          "title": "Shell command injection via subprocess shell=True",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Pass the command as an argument list with shell=False (the default) and never build command strings from user input."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-subprocess-shell-true",
+      "path": "src\\app.py",
+      "start": {
+        "line": 22,
+        "col": 5,
+        "offset": 570
+      },
+      "end": {
+        "line": 22,
+        "col": 45,
+        "offset": 610
+      },
+      "extra": {
+        "message": "A subprocess is started with shell=True, so shell metacharacters in any interpolated value are executed as commands.",
+        "metadata": {
+          "title": "Shell command injection via subprocess shell=True",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Pass the command as an argument list with shell=False (the default) and never build command strings from user input."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-os-system",
+      "path": "src\\app.py",
+      "start": {
+        "line": 29,
+        "col": 5,
+        "offset": 817
+      },
+      "end": {
+        "line": 29,
+        "col": 34,
+        "offset": 846
+      },
+      "extra": {
+        "message": "os.system/os.popen run a shell command built from a non-literal value, which allows command injection.",
+        "metadata": {
+          "title": "Shell command built from a variable",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use subprocess.run with an argument list and shell=False instead of os.system/os.popen."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-sql-string-building",
+      "path": "src\\app.py",
+      "start": {
+        "line": 34,
+        "col": 5,
+        "offset": 951
+      },
+      "end": {
+        "line": 34,
+        "col": 66,
+        "offset": 1012
+      },
+      "extra": {
+        "message": "A SQL statement is built with string formatting or concatenation and passed to execute(), which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use parameterized queries (execute(\"... WHERE id = %s\", (value,))) or the ORM's query builder."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-sql-string-building",
+      "path": "src\\app.py",
+      "start": {
+        "line": 36,
+        "col": 5,
+        "offset": 1062
+      },
+      "end": {
+        "line": 36,
+        "col": 64,
+        "offset": 1121
+      },
+      "extra": {
+        "message": "A SQL statement is built with string formatting or concatenation and passed to execute(), which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use parameterized queries (execute(\"... WHERE id = %s\", (value,))) or the ORM's query builder."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-sql-string-building",
+      "path": "src\\app.py",
+      "start": {
+        "line": 38,
+        "col": 5,
+        "offset": 1171
+      },
+      "end": {
+        "line": 38,
+        "col": 76,
+        "offset": 1242
+      },
+      "extra": {
+        "message": "A SQL statement is built with string formatting or concatenation and passed to execute(), which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use parameterized queries (execute(\"... WHERE id = %s\", (value,))) or the ORM's query builder."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-sql-string-building",
+      "path": "src\\app.py",
+      "start": {
+        "line": 40,
+        "col": 5,
+        "offset": 1292
+      },
+      "end": {
+        "line": 40,
+        "col": 72,
+        "offset": 1359
+      },
+      "extra": {
+        "message": "A SQL statement is built with string formatting or concatenation and passed to execute(), which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use parameterized queries (execute(\"... WHERE id = %s\", (value,))) or the ORM's query builder."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-pickle-load",
+      "path": "src\\app.py",
+      "start": {
+        "line": 45,
+        "col": 5,
+        "offset": 1511
+      },
+      "end": {
+        "line": 45,
+        "col": 26,
+        "offset": 1532
+      },
+      "extra": {
+        "message": "pickle deserialization executes code embedded in the payload; loading untrusted data leads to remote code execution.",
+        "metadata": {
+          "title": "Unsafe deserialization with pickle",
+          "cwe": [
+            "CWE-502: Deserialization of Untrusted Data"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Exchange untrusted data as JSON. If pickle is unavoidable, sign the payload and verify the signature before loading."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-yaml-unsafe-load",
+      "path": "src\\app.py",
+      "start": {
+        "line": 48,
+        "col": 5,
+        "offset": 1580
+      },
+      "end": {
+        "line": 48,
+        "col": 23,
+        "offset": 1598
+      },
+      "extra": {
+        "message": "yaml.load without a safe loader can construct arbitrary Python objects from untrusted YAML.",
+        "metadata": {
+          "title": "Unsafe YAML deserialization",
+          "cwe": [
+            "CWE-502: Deserialization of Untrusted Data"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use yaml.safe_load or pass Loader=yaml.SafeLoader."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-yaml-unsafe-load",
+      "path": "src\\app.py",
+      "start": {
+        "line": 50,
+        "col": 5,
+        "offset": 1645
+      },
+      "end": {
+        "line": 50,
+        "col": 43,
+        "offset": 1683
+      },
+      "extra": {
+        "message": "yaml.load without a safe loader can construct arbitrary Python objects from untrusted YAML.",
+        "metadata": {
+          "title": "Unsafe YAML deserialization",
+          "cwe": [
+            "CWE-502: Deserialization of Untrusted Data"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Use yaml.safe_load or pass Loader=yaml.SafeLoader."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-python-tls-verification-disabled",
+      "path": "src\\app.py",
+      "start": {
+        "line": 57,
+        "col": 5,
+        "offset": 1891
+      },
+      "end": {
+        "line": 57,
+        "col": 54,
+        "offset": 1940
+      },
+      "extra": {
+        "message": "TLS certificate verification is disabled, allowing man-in-the-middle interception of this request.",
+        "metadata": {
+          "title": "TLS certificate verification disabled",
+          "cwe": [
+            "CWE-295: Improper Certificate Validation"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Remove verify=False. For private CAs, pass the CA bundle path to verify= instead."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-eval",
+      "path": "web\\server.js",
+      "start": {
+        "line": 10,
+        "col": 3,
+        "offset": 329
+      },
+      "end": {
+        "line": 10,
+        "col": 14,
+        "offset": 340
+      },
+      "extra": {
+        "message": "eval() on a non-literal value executes attacker-controlled input as JavaScript.",
+        "metadata": {
+          "title": "Dynamic code execution with eval",
+          "cwe": [
+            "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Remove eval. Use JSON.parse for data and explicit lookup tables for dynamic behavior."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-new-function",
+      "path": "web\\server.js",
+      "start": {
+        "line": 15,
+        "col": 14,
+        "offset": 427
+      },
+      "end": {
+        "line": 15,
+        "col": 38,
+        "offset": 451
+      },
+      "extra": {
+        "message": "new Function() compiles a string into code at runtime, which is equivalent to eval.",
+        "metadata": {
+          "title": "Dynamic code execution with new Function",
+          "cwe": [
+            "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Replace runtime code generation with ordinary functions."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-child-process-exec",
+      "path": "web\\server.js",
+      "start": {
+        "line": 20,
+        "col": 3,
+        "offset": 578
+      },
+      "end": {
+        "line": 20,
+        "col": 25,
+        "offset": 600
+      },
+      "extra": {
+        "message": "child_process.exec/execSync runs its argument through a shell; a non-literal command allows command injection.",
+        "metadata": {
+          "title": "Shell command injection via child_process.exec",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use execFile/spawn with an argument array and no shell, and validate every argument against an allowlist."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-child-process-exec",
+      "path": "web\\server.js",
+      "start": {
+        "line": 22,
+        "col": 3,
+        "offset": 643
+      },
+      "end": {
+        "line": 22,
+        "col": 27,
+        "offset": 667
+      },
+      "extra": {
+        "message": "child_process.exec/execSync runs its argument through a shell; a non-literal command allows command injection.",
+        "metadata": {
+          "title": "Shell command injection via child_process.exec",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use execFile/spawn with an argument array and no shell, and validate every argument against an allowlist."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-child-process-exec",
+      "path": "web\\server.js",
+      "start": {
+        "line": 24,
+        "col": 3,
+        "offset": 710
+      },
+      "end": {
+        "line": 24,
+        "col": 39,
+        "offset": 746
+      },
+      "extra": {
+        "message": "child_process.exec/execSync runs its argument through a shell; a non-literal command allows command injection.",
+        "metadata": {
+          "title": "Shell command injection via child_process.exec",
+          "cwe": [
+            "CWE-78: OS Command Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use execFile/spawn with an argument array and no shell, and validate every argument against an allowlist."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-dom-xss-sink",
+      "path": "web\\server.js",
+      "start": {
+        "line": 31,
+        "col": 3,
+        "offset": 905
+      },
+      "end": {
+        "line": 31,
+        "col": 28,
+        "offset": 930
+      },
+      "extra": {
+        "message": "A non-literal value is written to an HTML sink, which allows cross-site scripting if the value contains user input.",
+        "metadata": {
+          "title": "Cross-site scripting through an HTML sink",
+          "cwe": [
+            "CWE-79: Cross-site Scripting"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Assign textContent instead, or sanitize the HTML with a vetted library such as DOMPurify before inserting it."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-dom-xss-sink",
+      "path": "web\\server.js",
+      "start": {
+        "line": 33,
+        "col": 3,
+        "offset": 967
+      },
+      "end": {
+        "line": 33,
+        "col": 24,
+        "offset": 988
+      },
+      "extra": {
+        "message": "A non-literal value is written to an HTML sink, which allows cross-site scripting if the value contains user input.",
+        "metadata": {
+          "title": "Cross-site scripting through an HTML sink",
+          "cwe": [
+            "CWE-79: Cross-site Scripting"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Assign textContent instead, or sanitize the HTML with a vetted library such as DOMPurify before inserting it."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-sql-string-building",
+      "path": "web\\server.js",
+      "start": {
+        "line": 40,
+        "col": 3,
+        "offset": 1161
+      },
+      "end": {
+        "line": 40,
+        "col": 54,
+        "offset": 1212
+      },
+      "extra": {
+        "message": "A SQL statement is built by concatenation or template interpolation and passed to a query function, which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use placeholders ($1, ?) with a values array, or the query builder's parameter binding."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-sql-string-building",
+      "path": "web\\server.js",
+      "start": {
+        "line": 42,
+        "col": 3,
+        "offset": 1256
+      },
+      "end": {
+        "line": 42,
+        "col": 54,
+        "offset": 1307
+      },
+      "extra": {
+        "message": "A SQL statement is built by concatenation or template interpolation and passed to a query function, which allows SQL injection.",
+        "metadata": {
+          "title": "SQL injection through string-built query",
+          "cwe": [
+            "CWE-89: SQL Injection"
+          ],
+          "confidence": "MEDIUM",
+          "recommendation": "Use placeholders ($1, ?) with a values array, or the query builder's parameter binding."
+        },
+        "severity": "ERROR",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "app.scanners.rules.semgrep.rsa-js-tls-verification-disabled",
+      "path": "web\\server.js",
+      "start": {
+        "line": 47,
+        "col": 33,
+        "offset": 1482
+      },
+      "end": {
+        "line": 47,
+        "col": 79,
+        "offset": 1528
+      },
+      "extra": {
+        "message": "TLS certificate verification is disabled, allowing man-in-the-middle interception.",
+        "metadata": {
+          "title": "TLS certificate verification disabled",
+          "cwe": [
+            "CWE-295: Improper Certificate Validation"
+          ],
+          "confidence": "HIGH",
+          "recommendation": "Keep certificate verification on; supply a custom CA with the `ca` option when using private certificates."
+        },
+        "severity": "WARNING",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "errors": []
+}
