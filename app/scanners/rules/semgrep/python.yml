@@ -1,0 +1,141 @@
+# Repo Security Auditor Semgrep rules for Python (SRS FR-04, ticket O-08).
+# metadata.title / recommendation / confidence feed the normalized Finding.
+# Test targets: tests/fixtures/semgrep/python.py (run `semgrep --test`).
+rules:
+  - id: rsa-python-eval-exec
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Dynamic code execution with eval()/exec() on a non-literal value lets
+      attacker-controlled input run arbitrary Python code.
+    patterns:
+      - pattern-either:
+          - pattern: eval($CODE, ...)
+          - pattern: exec($CODE, ...)
+      - pattern-not: eval("...", ...)
+      - pattern-not: exec("...", ...)
+    metadata:
+      title: Dynamic code execution with eval or exec
+      cwe: ["CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"]
+      confidence: MEDIUM
+      recommendation: >-
+        Remove eval/exec. Parse data with json.loads or ast.literal_eval, or
+        dispatch to an explicit allowlist of functions.
+
+  - id: rsa-python-subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A subprocess is started with shell=True, so shell metacharacters in any
+      interpolated value are executed as commands.
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.$FUNC(..., shell=True, ...)
+          - pattern: subprocess.$FUNC(..., shell=1, ...)
+      - pattern-not: subprocess.$FUNC("...", ..., shell=True, ...)
+    metadata:
+      title: Shell command injection via subprocess shell=True
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: HIGH
+      recommendation: >-
+        Pass the command as an argument list with shell=False (the default)
+        and never build command strings from user input.
+
+  - id: rsa-python-os-system
+    languages: [python]
+    severity: WARNING
+    message: >-
+      os.system/os.popen run a shell command built from a non-literal value,
+      which allows command injection.
+    patterns:
+      - pattern-either:
+          - pattern: os.system($CMD)
+          - pattern: os.popen($CMD, ...)
+      - pattern-not: os.system("...")
+      - pattern-not: os.popen("...", ...)
+    metadata:
+      title: Shell command built from a variable
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: MEDIUM
+      recommendation: >-
+        Use subprocess.run with an argument list and shell=False instead of
+        os.system/os.popen.
+
+  - id: rsa-python-sql-string-building
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A SQL statement is built with string formatting or concatenation and
+      passed to execute(), which allows SQL injection.
+    pattern-either:
+      - pattern: $CURSOR.execute("..." % $ARGS, ...)
+      - pattern: $CURSOR.execute("..." + $ARG, ...)
+      - pattern: $CURSOR.execute("..." + $ARG + "...", ...)
+      - pattern: $CURSOR.execute("...".format(...), ...)
+      - pattern: $CURSOR.execute(f"...", ...)
+      - pattern: $CURSOR.executemany(f"...", ...)
+      - pattern: $CURSOR.executemany("..." % $ARGS, ...)
+    metadata:
+      title: SQL injection through string-built query
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      recommendation: >-
+        Use parameterized queries (execute("... WHERE id = %s", (value,))) or
+        the ORM's query builder.
+
+  - id: rsa-python-pickle-load
+    languages: [python]
+    severity: WARNING
+    message: >-
+      pickle deserialization executes code embedded in the payload; loading
+      untrusted data leads to remote code execution.
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: cPickle.loads(...)
+      - pattern: cPickle.load(...)
+    metadata:
+      title: Unsafe deserialization with pickle
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: MEDIUM
+      recommendation: >-
+        Exchange untrusted data as JSON. If pickle is unavoidable, sign the
+        payload and verify the signature before loading.
+
+  - id: rsa-python-yaml-unsafe-load
+    languages: [python]
+    severity: WARNING
+    message: >-
+      yaml.load without a safe loader can construct arbitrary Python objects
+      from untrusted YAML.
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load(...)
+          - pattern: yaml.unsafe_load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=SafeLoader, ...)
+    metadata:
+      title: Unsafe YAML deserialization
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: HIGH
+      recommendation: Use yaml.safe_load or pass Loader=yaml.SafeLoader.
+
+  - id: rsa-python-tls-verification-disabled
+    languages: [python]
+    severity: WARNING
+    message: >-
+      TLS certificate verification is disabled, allowing man-in-the-middle
+      interception of this request.
+    pattern-either:
+      - pattern: requests.$METHOD(..., verify=False, ...)
+      - pattern: httpx.$METHOD(..., verify=False, ...)
+      - pattern: httpx.Client(..., verify=False, ...)
+      - pattern: httpx.AsyncClient(..., verify=False, ...)
+    metadata:
+      title: TLS certificate verification disabled
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      recommendation: >-
+        Remove verify=False. For private CAs, pass the CA bundle path to
+        verify= instead.
