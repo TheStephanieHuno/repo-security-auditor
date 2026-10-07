@@ -1,0 +1,85 @@
+# Repo Security Auditor Gitleaks rules (SRS FR-04, ticket O-07).
+#
+# Extends the upstream default ruleset with project rules for the secret
+# classes the MVP must report. Every project rule carries a "severity:<level>"
+# tag, which the normalizer maps to the finding severity; upstream rules
+# without one default to HIGH. Validated by tests/test_scanner_rules.py.
+
+title = "repo-security-auditor"
+
+[extend]
+useDefault = true
+# Upstream rules replaced by the project rules below; keeping both would
+# report the same secret twice.
+disabledRules = [
+  "aws-access-token",
+  "github-pat",
+  "github-oauth",
+  "github-app-token",
+  "github-refresh-token",
+  "github-fine-grained-pat",
+  "private-key",
+]
+
+[[rules]]
+id = "rsa-aws-access-key-id"
+description = "AWS access key ID"
+regex = '''\b((?:AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16})\b'''
+secretGroup = 1
+keywords = ["akia", "asia", "abia", "acca"]
+tags = ["aws", "severity:critical"]
+
+[[rules]]
+id = "rsa-aws-secret-access-key"
+description = "AWS secret access key"
+regex = '''(?i)aws_?secret_?access_?key['"]?\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})(?:[^A-Za-z0-9/+=]|$)'''
+secretGroup = 1
+keywords = ["aws_secret", "awssecret", "secret_access_key", "secretaccesskey"]
+tags = ["aws", "severity:critical"]
+
+[[rules]]
+id = "rsa-github-token"
+description = "GitHub personal access, OAuth, app, or refresh token"
+regex = '''\b(gh[pousr]_[A-Za-z0-9]{36,255})\b'''
+secretGroup = 1
+keywords = ["ghp_", "gho_", "ghu_", "ghs_", "ghr_"]
+tags = ["github", "severity:critical"]
+
+[[rules]]
+id = "rsa-github-fine-grained-token"
+description = "GitHub fine-grained personal access token"
+regex = '''\b(github_pat_[A-Za-z0-9_]{82})\b'''
+secretGroup = 1
+keywords = ["github_pat_"]
+tags = ["github", "severity:critical"]
+
+[[rules]]
+id = "rsa-database-url-password"
+description = "Database connection string with an embedded password"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss|mssql|sqlserver|amqp)://[^:\s/@'"]+:([^@\s/'"]{3,})@[^\s'"]+'''
+secretGroup = 1
+keywords = ["postgres", "mysql", "mariadb", "mongodb", "redis", "mssql", "sqlserver", "amqp"]
+tags = ["database", "severity:high"]
+
+  [rules.allowlist]
+  regexTarget = "secret"
+  regexes = ['''(?i)^(?:\$\{[^}]*\}|\$[A-Z_]+|<[^>]*>|\{\{[^}]*\}\}|password|passwd|pass|changeme|example|secret|\*+|x+)$''']
+
+[[rules]]
+id = "rsa-database-password-assignment"
+description = "Hardcoded database password"
+regex = '''(?i)\b(?:db_?pass(?:word)?|database_?pass(?:word)?|mysql_?(?:root_?)?password|postgres(?:ql)?_?password|pg_?password|mongo(?:db)?_?password)\b['"]?\s*[:=]\s*['"]([^'"\s]{4,})['"]'''
+secretGroup = 1
+keywords = ["pass"]
+tags = ["database", "severity:high"]
+
+  [rules.allowlist]
+  regexTarget = "secret"
+  regexes = ['''(?i)^(?:\$\{[^}]*\}|<[^>]*>|\{\{[^}]*\}\}|password|changeme|example|your[_-]?password|\*+|x+)$''']
+
+[[rules]]
+id = "rsa-private-key"
+description = "Private key"
+regex = '''-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----'''
+keywords = ["-----begin"]
+tags = ["private-key", "severity:critical"]
