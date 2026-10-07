@@ -212,41 +212,6 @@ export function Login() {
             Open demo workspace
             <ArrowRight className="size-4" />
           </Button>}
-          <Button
-            variant="outline"
-            disabled={isPending}
-            className="mt-4 h-11 w-full"
-            onClick={() => {
-              navigate(
-                `/signup${
-                  params.get("redirect")
-                    ? `?redirect=${encodeURIComponent(params.get("redirect")!)}`
-                    : ""
-                }`
-              )
-            }}
-          >
-            <Github className="size-4" />
-            Sign up with GitHub
-          </Button>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Don't have an account?{" "}
-            <button
-              type="button"
-              className="underline"
-              onClick={() =>
-                navigate(
-                  `/signup${
-                    params.get("redirect")
-                      ? `?redirect=${encodeURIComponent(params.get("redirect")!)}`
-                      : ""
-                  }`
-                )
-              }
-            >
-              Sign up
-            </button>
-          </p>
         </div>
       </div>
       <Dialog open={forgot} onOpenChange={setForgot}>

@@ -182,22 +182,21 @@ export function useTriggerScan() {
 }
 
 export function useScanStatus(id: string) {
-  const qc = useQueryClient()
   return useQuery({
     queryKey: queryKeys.scanStatus(id),
     queryFn: () => api.getScanStatus(id),
+    // Only poll when we have an id and the status is not yet terminal.
+    // refetchInterval returning false also stops the poll, but disabling here
+    // prevents any request at all when the scan id is empty or not active.
     enabled: !!id,
     refetchInterval: (query) => {
       const data = query.state.data
-      if (!data) return 2000 // Poll every 2s initially
-      // Stop polling if completed or failed
+      if (!data) return 2000 // first fetch not yet back — poll every 2 s
       const status = data.status.toLowerCase()
+      // Stop polling once the scan reaches a terminal state
       if (["completed", "failed", "partial", "cancelled"].includes(status)) return false
       return 2000
     },
-    // When a scan completes, invalidate related data
-    // We can use a side effect inside the query or via the components.
-    // For now, components will react to the status change.
   })
 }
 
@@ -210,8 +209,17 @@ export function useCancelScan() {
       qc.invalidateQueries({ queryKey: queryKeys.scanStatus(id) })
       qc.invalidateQueries({ queryKey: queryKeys.scans() })
     },
+    onError: (_error, id) => {
+      // On any error (e.g. 409 — scan already finished), re-fetch the real
+      // status so the UI reflects what the backend actually has, not a stale
+      // client-side view.
+      qc.invalidateQueries({ queryKey: queryKeys.scan(id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scanStatus(id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scans() })
+    },
   })
 }
+
 
 export function useScanFindings(scanId: string, query: FindingQuery = {}) {
   return useQuery({

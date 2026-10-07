@@ -32,7 +32,7 @@ import { endpoints } from "./endpoints"
 
 const isLive = process.env.NEXT_PUBLIC_API_MODE === "live"
 
-function toTitleCase(str?: string) {
+export function toTitleCase(str?: string) {
   if (!str) return ""
   if (str === "false_positive") return "False positive"
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()

@@ -37,6 +37,7 @@ import {
   scanStages,
   type ScanStatus,
 } from "@/lib/security-model"
+import { toTitleCase } from "@/lib/api/index"
 import {
   Breadcrumbs,
   CancelScanDialog,
@@ -58,7 +59,7 @@ import {
   SeverityDistribution,
   StatusBadge,
 } from "./components"
-import { useRepositories, useScans, useFindings } from "@/lib/api/hooks"
+import { useRepositories, useScans, useFindings, useScanStatus } from "@/lib/api/hooks"
 import { FindingsList } from "./findings"
 
 export function ScanHistory() {
@@ -360,18 +361,30 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
     (["queued", "running", "failed", "partial"].includes(override || "")
       ? {
           ...original,
-          status: ({
-            queued: "Queued",
-            running: "Running",
-            failed: "Failed",
-            partial: "Partial",
-          } as Record<string, ScanStatus>)[override!],
+          status: toTitleCase(override!) as ScanStatus,
           stage: override === "running" ? 4 : original.stage,
           progress: override === "running" ? 43 : original.progress,
         }
       : original)
-  const repo = repositories.find((item) => item.id === scan?.repoId)
-  if (!scan || !repo)
+
+  // Poll status only while the scan is in a non-terminal state.
+  const isActive = scan?.status === "Queued" || scan?.status === "Running"
+  const { data: liveStatus } = useScanStatus(isActive ? (scan?.id ?? "") : "")
+
+  // Merge the most-recent polled status/progress into the scan object.
+  // toTitleCase converts the lowercase backend value to the UI type using the single mapping.
+  const displayScan =
+    scan && liveStatus
+      ? {
+          ...scan,
+          status: (toTitleCase(liveStatus.status) || scan.status) as ScanStatus,
+          progress: liveStatus.progress,
+          stage: liveStatus.stage,
+        }
+      : scan
+
+  const repo = repositories.find((item) => item.id === displayScan?.repoId)
+  if (!displayScan || !repo)
     return (
       <EmptyState
         title="Scan not found"
@@ -379,40 +392,40 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
         action={<LinkButton to="/scans">View scan history</LinkButton>}
       />
     )
-  const findings = getScanFindings(scan, allFindings)
+  const findings = getScanFindings(displayScan, allFindings)
   const previous = scans.find(
     (item) =>
       item.repoId === repo.id &&
-      Number(item.id) < Number(scan.id) &&
+      Number(item.id) < Number(displayScan.id) &&
       ["Completed", "Partial"].includes(item.status),
   )
   const priorFindings = getScanFindings(previous, allFindings)
   const tab = findingsTab ? "findings" : params.get("tab") || "overview"
   const progressView =
-    ["Queued", "Running", "Failed"].includes(scan.status) &&
-    !(findingsTab && scan.partialRetry)
+    ["Queued", "Running", "Failed"].includes(displayScan.status) &&
+    !(findingsTab && displayScan.partialRetry)
   const changeTab = (value: unknown) => {
     const next = String(value)
     if (next === "findings")
       navigate(
-        `/scans/${scan.id}/findings${
-          scan.status === "Partial" ? "?state=partial" : ""
+        `/scans/${displayScan.id}/findings${
+          displayScan.status === "Partial" ? "?state=partial" : ""
         }`,
       )
     else
       navigate(
-        `/scans/${scan.id}?tab=${next}${
+        `/scans/${displayScan.id}?tab=${next}${
           override === "partial" ? "&state=partial" : ""
         }`,
       )
   }
   return (
     <PageState kind="Scan results">
-      {scan.retryOf && (
+      {displayScan.retryOf && (
         <Notice title="Rescan with preserved evidence">
           This is a new scan attempt.{" "}
-          <Link to={`/scans/${scan.retryOf}`} className="underline">
-            Original scan #{scan.retryOf}
+          <Link to={`/scans/${displayScan.retryOf}`} className="underline">
+            Original scan #{displayScan.retryOf}
           </Link>{" "}
           remains in history.
         </Notice>
@@ -439,37 +452,37 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
         items={[
           { label: "Repositories", to: "/repositories" },
           { label: repo.name, to: `/repositories/${repo.id}` },
-          { label: `Scan #${scan.id}` },
+          { label: `Scan #${displayScan.id}` },
         ]}
       />
       <PageHeader
         title={
           progressView
-            ? scan.status === "Failed"
+            ? displayScan.status === "Failed"
               ? "Scan failed"
               : `Scanning ${repo.name}`
             : "Security results"
         }
         description={
           progressView
-            ? scan.status === "Queued"
+            ? displayScan.status === "Queued"
               ? "Your scan is queued and waiting for an isolated worker."
-              : scan.status === "Failed"
+              : displayScan.status === "Failed"
                 ? "Repository ingestion could not be completed."
                 : "Independent checks are gathering evidence from your repository."
-            : `${repo.name} · Scan #${scan.id} · ${scan.date}`
+            : `${repo.name} · Scan #${displayScan.id} · ${displayScan.date}`
         }
         eyebrow={
           progressView
             ? "SECURITY ANALYSIS"
-            : scan.status === "Completed"
+            : displayScan.status === "Completed"
               ? "SCAN COMPLETE"
               : "AVAILABLE RESULTS"
         }
       >
         {!progressView && (
           <>
-            <DownloadReport scanId={scan.id} />
+            <DownloadReport scanId={displayScan.id} />
             <Button className="h-9" onClick={() => setScanOpen(true)}>
               <RotateCcw className="size-3.5" />
               Rescan
@@ -477,13 +490,13 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           </>
         )}
       </PageHeader>
-      {scan.partialRetry && scan.status === "Running" && (
+      {displayScan.partialRetry && displayScan.status === "Running" && (
         <div className="mb-5">
           <Notice
             title="Retrying configuration analysis"
             tone="warning"
             action={
-              <LinkButton to={`/scans/${scan.id}/findings`}>
+              <LinkButton to={`/scans/${displayScan.id}/findings`}>
                 View preserved findings
                 <ArrowRight className="size-3" />
               </LinkButton>
@@ -499,15 +512,15 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           <Panel>
             <div className="border-b px-6 py-5">
               <div className="flex items-center justify-between">
-                <StatusBadge status={scan.status} />
+                <StatusBadge status={displayScan.status} />
                 <span className="font-mono text-sm font-medium">
-                  {scan.status === "Queued"
+                  {displayScan.status === "Queued"
                     ? "Awaiting worker"
-                    : `${scan.progress}%`}
+                    : `${displayScan.progress}%`}
                 </span>
               </div>
               <Progress
-                value={scan.status === "Queued" ? 0 : scan.progress}
+                value={displayScan.status === "Queued" ? 0 : displayScan.progress}
                 aria-label="Overall scan progress"
                 className="mt-5 [&_[data-slot=progress-track]]:h-2 [&_[data-slot=progress-indicator]]:bg-trust"
               />
@@ -515,19 +528,19 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                 <span>
                   Branch:{" "}
                   <span className="font-mono text-foreground">
-                    {scan.branch || repo.branch}
+                    {displayScan.branch || repo.branch}
                   </span>
                 </span>
                 <span>
                   Commit:{" "}
                   <span className="font-mono text-foreground">
-                    {scan.commit || repo.commit}
+                    {displayScan.commit || repo.commit}
                   </span>
                 </span>
                 <span>
                   Estimated remaining:{" "}
                   <span className="text-foreground">
-                    {scan.isNew ? "less than a minute (demo)" : "a few minutes"}
+                    {displayScan.isNew ? "less than a minute (demo)" : "a few minutes"}
                   </span>
                 </span>
               </div>
@@ -541,15 +554,15 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                   {scanStages.map((stage, index) => {
                     const isScanner = index >= 2 && index <= 5
                     const completed =
-                      scan.status !== "Queued" && index < scan.stage
+                      displayScan.status !== "Queued" && index < displayScan.stage
                     const running =
-                      scan.status === "Running" &&
-                      (index === scan.stage ||
+                      displayScan.status === "Running" &&
+                      (index === displayScan.stage ||
                         (isScanner &&
-                          scan.stage >= 2 &&
-                          scan.stage <= 5 &&
-                          index >= scan.stage))
-                    const failed = scan.status === "Failed" && index === 1
+                          displayScan.stage >= 2 &&
+                          displayScan.stage <= 5 &&
+                          index >= displayScan.stage))
+                    const failed = displayScan.status === "Failed" && index === 1
                     return (
                       <div
                         key={stage}
@@ -623,13 +636,13 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                   aria-live="polite"
                   className="space-y-5 font-mono text-xs leading-relaxed"
                 >
-                  {scan.status === "Queued" ? (
+                  {displayScan.status === "Queued" ? (
                     <p className="text-muted-foreground">
                       Job queued. Waiting for an available scan worker.
                     </p>
                   ) : (
                     scanActivity
-                      .slice(0, Math.min(scan.stage + 1, 10))
+                      .slice(0, Math.min(displayScan.stage + 1, 10))
                       .map((activity, index) => (
                         <div key={activity} className="flex gap-3">
                           <span className="shrink-0 text-muted-foreground">
@@ -637,7 +650,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                           </span>
                           <span
                             className={
-                              index === scan.stage
+                              index === displayScan.stage
                                 ? "text-trust"
                                 : "text-muted-foreground"
                             }
@@ -661,13 +674,13 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                 <ShieldCheck className="size-4 text-trust" />
                 Isolated scan environment
               </span>
-              {scan.status === "Queued" && !scan.isNew ? (
+              {displayScan.status === "Queued" && !displayScan.isNew ? (
                 <Button onClick={retry}>
                   <Play className="size-3" />
                   Start security scan
                 </Button>
               ) : (
-                scan.status !== "Failed" && (
+                displayScan.status !== "Failed" && (
                   <div className="flex items-center gap-2">
                     <Button variant="outline" onClick={() => setCancelOpen(true)}>
                       Cancel scan
@@ -677,7 +690,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
               )}
             </div>
           </Panel>
-          {scan.status === "Failed" && (
+          {displayScan.status === "Failed" && (
             <div className="mt-5">
               <Notice
                 tone="error"
@@ -703,14 +716,14 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
         </>
       ) : (
         <>
-          {scan.status === "Partial" && (
+          {displayScan.status === "Partial" && (
             <div className="mb-5">
               <Notice
                 tone="warning"
                 title="3 of 4 security checks completed"
                 action={
                   <div className="flex flex-wrap gap-2">
-                    <LinkButton to={`/scans/${scan.id}/findings`}>
+                    <LinkButton to={`/scans/${displayScan.id}/findings`}>
                       View available findings
                     </LinkButton>
                     <Button variant="outline" onClick={retry}>
@@ -769,18 +782,17 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     <SeverityDistribution findings={findings} />
                   </div>
           </Panel>
-          {(scan.status === "Queued" || scan.status === "Running") && <CancelScanDialog scanId={scan.id} open={cancelOpen} onOpenChange={setCancelOpen} />}
                 <Panel>
                   <PanelHeader title="Scan context" />
                   <dl className="space-y-4 px-5 pb-5 text-xs">
                     {[
                       [
                         "Status",
-                        <StatusBadge key="status" status={scan.status} />,
+                        <StatusBadge key="status" status={displayScan.status} />,
                       ],
-                        ["Branch", scan.branch || repo.branch],
-                      ["Commit", scan.commit || repo.commit],
-                      ["Duration", scan.duration],
+                        ["Branch", displayScan.branch || repo.branch],
+                      ["Commit", displayScan.commit || repo.commit],
+                      ["Duration", displayScan.duration],
                       [
                         "Files analyzed",
                         repo.id === "web-app" ? "284 (sample)" : "126 (sample)",
@@ -812,7 +824,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     return (
                       <Link
                         key={category}
-                        to={`/scans/${scan.id}/findings?category=${category}`}
+                        to={`/scans/${displayScan.id}/findings?category=${category}`}
                         className="border-r p-5 last:border-r-0 hover:bg-muted/40"
                       >
                         <Icon className="mb-4 size-5 text-muted-foreground" />
@@ -908,21 +920,21 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                       step: "01",
                       title: "Review highest-severity evidence",
                       copy: "Verify the location, rule, and captured scanner output.",
-                      to: `/scans/${scan.id}/findings`,
+                      to: `/scans/${displayScan.id}/findings`,
                     },
                     {
                       step: "02",
                       title: "Understand the context",
                       copy: "Separate verified patterns from inferred impact.",
                       to: findings[0]
-                        ? `/scans/${scan.id}/findings/${findings[0].id}`
-                        : `/scans/${scan.id}/findings`,
+                        ? `/scans/${displayScan.id}/findings/${findings[0].id}`
+                        : `/scans/${displayScan.id}/findings`,
                     },
                     {
                       step: "03",
                       title: "Share the security report",
                       copy: "Bring evidence and remediation guidance to your team.",
-                      to: `/reports/${scan.id}`,
+                      to: `/reports/${displayScan.id}`,
                     },
                   ].map((item) => (
                     <Link
@@ -945,16 +957,16 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
               </Panel>
             </TabsContent>
             <TabsContent value="findings">
-              <FindingsList scanId={scan.id} />
+              <FindingsList scanId={displayScan.id} />
             </TabsContent>
             <TabsContent value="scanners">
               <div className="grid gap-4 md:grid-cols-2">
                 {scannerInfo.map((scanner) => {
                   const failed =
-                    scan.status === "Partial" && scanner.name === "Checkov"
+                    displayScan.status === "Partial" && scanner.name === "Checkov"
                   const running =
-                    scan.partialRetry &&
-                    scan.status === "Running" &&
+                    displayScan.partialRetry &&
+                    displayScan.status === "Running" &&
                     scanner.name === "Checkov"
                   return (
                     <Panel key={scanner.name}>
@@ -1021,7 +1033,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                           </Button>
                         ) : (
                           <LinkButton
-                            to={`/scans/${scan.id}/findings?scanner=${scanner.name}`}
+                            to={`/scans/${displayScan.id}/findings?scanner=${scanner.name}`}
                             variant="ghost"
                             className="w-full"
                           >
@@ -1039,7 +1051,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
               <Panel>
                 <PanelHeader title="Repository scan history" />
                 {scans
-                  .filter((scanRecord) => scanRecord.repoId === repo.id)
+                  .filter((scanRecord) => scanRecord.repoId === displayScan.repoId)
                   .map((item) => (
                     <Link
                       key={item.id}
@@ -1059,7 +1071,8 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           </Tabs>
         </>
       )}
-      <ScanDialog repo={repo} initialBranch={scan.branch || repo.branch} open={scanOpen} onOpenChange={setScanOpen} />
+      {isActive && <CancelScanDialog scanId={displayScan.id} open={cancelOpen} onOpenChange={setCancelOpen} />}
+      <ScanDialog repo={repo} initialBranch={displayScan.branch || repo.branch} open={scanOpen} onOpenChange={setScanOpen} />
     </PageState>
   )
 }
