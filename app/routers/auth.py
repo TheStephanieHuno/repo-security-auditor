@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, status
 from sqlalchemy import exists, func, select
 
 from app.api.serializers import user_to_api
+from app.core.audit import AuditEvent, AuditOutcome, audit_event, email_fingerprint
 from app.core.dependencies import CurrentClaims, DBSession
 from app.core.errors import APIError
 from app.core.rate_limit import login_failures
@@ -57,6 +58,13 @@ async def login(body: LoginRequest, request: Request, db: DBSession):
     client = request.client.host if request.client else "unknown"
     limiter_key = f"{client}:{email}"
     if login_failures.is_limited(limiter_key):
+        audit_event(
+            AuditEvent.LOGIN_FAILED,
+            outcome=AuditOutcome.DENIED,
+            request=request,
+            reason="rate_limited",
+            email_hash=email_fingerprint(email),
+        )
         raise APIError(429, "RATE_LIMITED", "Too many failed sign-in attempts. Try again later.")
     user = (
         await db.execute(select(User).where(func.lower(User.email) == email))
@@ -65,6 +73,14 @@ async def login(body: LoginRequest, request: Request, db: DBSession):
     valid = verify_password(body.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
     if user is None or not valid:
         login_failures.record(limiter_key)
+        audit_event(
+            AuditEvent.LOGIN_FAILED,
+            outcome=AuditOutcome.FAILURE,
+            request=request,
+            actor_id=user.public_id if user else None,
+            reason="unknown_account" if user is None else "invalid_password",
+            email_hash=email_fingerprint(email),
+        )
         raise APIError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.")
     login_failures.reset(limiter_key)
     return AuthResponse(

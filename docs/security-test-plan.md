@@ -103,6 +103,7 @@ committed TLS private key (CRITICAL), and vulnerable `underscore 1.8.3`
 | API-15 | Prompt injection | Repository text containing instructions sent to the LLM | wrapped as untrusted data; secrets redacted | `test_explanation_is_grounded_and_persisted` |
 | API-16 | PDF markup injection | `<script>`, unclosed tags, `&` in finding text | escaped, PDF renders | `test_pdf_renders_with_markup_like_content` |
 | API-17 | Untrusted repository content | Symlinks to host files, paths outside workspace | not followed / rejected | `test_relative_paths_cannot_escape_workspace`, `test_config_checks_skip_vendor_dirs_and_symlinks` |
+| API-18 | Repudiation / undetected attacks | Login failures, password changes, repository deletions, finding review updates | one JSON audit record each (actor, IP, target, outcome); no passwords, tokens, raw emails, or note text | `tests/test_audit_logging.py` |
 
 ## Results
 

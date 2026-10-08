@@ -1,9 +1,10 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.api.serializers import pagination, repository_to_api
+from app.core.audit import AuditEvent, AuditOutcome, audit_event
 from app.core.dependencies import CurrentUser, DBSession
 from app.core.errors import APIError
 from app.db.queries import get_owned_repository_by_public_id, owned_repositories, paginate
@@ -114,14 +115,31 @@ async def get_repository(id: uuid.UUID, user: CurrentUser, db: DBSession):
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_repository(id: uuid.UUID, user: CurrentUser, db: DBSession):
+async def remove_repository(id: uuid.UUID, request: Request, user: CurrentUser, db: DBSession):
     repository = await _owned(db, user, id)
+    target = {"repository_id": repository.public_id, "repository_url": repository.github_url}
     try:
         await delete_repository(db, repository=repository)
     except RepositoryBusyError:
+        audit_event(
+            AuditEvent.REPOSITORY_DELETE_BLOCKED,
+            outcome=AuditOutcome.DENIED,
+            request=request,
+            actor_id=user.public_id,
+            reason="scan_in_progress",
+            **target,
+        )
         raise APIError(
             409, "SCAN_IN_PROGRESS", "Cancel or wait for running scans before removing this repository."
         ) from None
+    await db.commit()
+    audit_event(
+        AuditEvent.REPOSITORY_DELETED,
+        outcome=AuditOutcome.SUCCESS,
+        request=request,
+        actor_id=user.public_id,
+        **target,
+    )
     return None
 
 

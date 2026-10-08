@@ -1,7 +1,8 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from sqlalchemy import exists, func, select
 
 from app.api.serializers import user_to_api
+from app.core.audit import AuditEvent, AuditOutcome, audit_event
 from app.core.dependencies import CurrentUser, DBSession
 from app.core.errors import APIError
 from app.core.security import PasswordTooLongError, hash_password, verify_password
@@ -44,14 +45,30 @@ async def update_profile(body: UpdateProfileRequest, user: CurrentUser, db: DBSe
 
 
 @router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(body: ChangePasswordRequest, user: CurrentUser, db: DBSession):
+async def change_password(
+    body: ChangePasswordRequest, request: Request, user: CurrentUser, db: DBSession
+):
     if not verify_password(body.currentPassword, user.password_hash):
+        audit_event(
+            AuditEvent.PASSWORD_CHANGE_FAILED,
+            outcome=AuditOutcome.FAILURE,
+            request=request,
+            actor_id=user.public_id,
+            reason="invalid_current_password",
+        )
         raise APIError(400, "INVALID_PASSWORD", "Current password is incorrect.")
     try:
         user.password_hash = hash_password(body.newPassword)
     except PasswordTooLongError:
         raise APIError(422, "VALIDATION_ERROR", "Password must be at most 72 bytes.") from None
-    await db.flush()
+    # Commit before auditing so the log never records a change that was not saved.
+    await db.commit()
+    audit_event(
+        AuditEvent.PASSWORD_CHANGED,
+        outcome=AuditOutcome.SUCCESS,
+        request=request,
+        actor_id=user.public_id,
+    )
     return None
 
 

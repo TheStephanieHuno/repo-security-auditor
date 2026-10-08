@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import Select
 
 from app.api.serializers import CATEGORY_LABELS, findings_to_api, pagination
+from app.core.audit import AuditEvent, AuditOutcome, audit_event
 from app.core.dependencies import CurrentUser, DBSession
 from app.core.errors import APIError
 from app.db.models import (
@@ -107,17 +108,32 @@ async def get_finding(id: uuid.UUID, user: CurrentUser, db: DBSession):
 
 
 @router.patch("/{id}", response_model=FindingResponse)
-async def review_finding(id: uuid.UUID, body: ReviewFindingRequest, user: CurrentUser, db: DBSession):
+async def review_finding(
+    id: uuid.UUID, body: ReviewFindingRequest, request: Request, user: CurrentUser, db: DBSession
+):
     finding = await _owned(db, user, id)
     note = body.reviewNote.strip() if body.reviewNote is not None else None
     if note is not None and len(note) > MAX_REVIEW_NOTE_LENGTH:
         raise APIError(
             422, "VALIDATION_ERROR", f"Review note must be at most {MAX_REVIEW_NOTE_LENGTH} characters."
         )
+    previous_status = finding.review_status
     finding.review_status = FindingReviewStatus[body.reviewStatus.value.upper()].value
     finding.review_note = note or None
     finding.reviewed_by = user.id
     finding.reviewed_at = utcnow()
-    await db.flush()
+    await db.commit()
+    audit_event(
+        AuditEvent.FINDING_REVIEW_UPDATED,
+        outcome=AuditOutcome.SUCCESS,
+        request=request,
+        actor_id=user.public_id,
+        finding_id=finding.public_id,
+        previous_status=previous_status.lower(),
+        new_status=finding.review_status.lower(),
+        # The note may hold sensitive context; record only that one exists.
+        note_provided=bool(finding.review_note),
+        note_length=len(finding.review_note or ""),
+    )
     await db.refresh(finding)
     return FindingResponse(status="success", data=(await findings_to_api(db, [finding]))[0])
