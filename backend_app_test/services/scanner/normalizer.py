@@ -3,14 +3,9 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any
 from backend_app_test.db.models import Finding as DBFinding
 
-def normalize_scanner_findings(
-    raw_findings: List[Dict[str, Any]],
-    scan_id: uuid.UUID,
-    repository_id: uuid.UUID
-) -> List[DBFinding]:
+def normalize_scanner_findings(raw_findings: List[Dict[str, Any]], scan_id: uuid.UUID, repository_id: uuid.UUID) -> List[DBFinding]:
     db_findings = []
     now = datetime.now(timezone.utc)
-
     for item in raw_findings:
         db_finding = DBFinding(
             id=uuid.uuid4(),
@@ -34,5 +29,4 @@ def normalize_scanner_findings(
             created_at=now
         )
         db_findings.append(db_finding)
-
     return db_findings

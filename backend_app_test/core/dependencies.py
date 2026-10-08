@@ -22,26 +22,15 @@ async def get_current_user(
             detail="Invalid or expired authentication token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    # Convert string ID from JWT to UUID object for database query
     try:
         user_uuid = uuid.UUID(user_id_str)
     except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Malformed token subject identifier.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed token identifier.")
 
     result = await db.execute(select(DBUser).where(DBUser.id == user_uuid))
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account not found.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account not found.")
     return user
 
 CurrentUser = Annotated[DBUser, Depends(get_current_user)]
