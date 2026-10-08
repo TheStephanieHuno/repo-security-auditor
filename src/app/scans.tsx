@@ -37,7 +37,7 @@ import {
   scanStages,
   type ScanStatus,
 } from "@/lib/security-model"
-import { toTitleCase } from "@/lib/api/index"
+import { isLive, toTitleCase } from "@/lib/api/index"
 import {
   Breadcrumbs,
   CancelScanDialog,
@@ -540,7 +540,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                 <span>
                   Estimated remaining:{" "}
                   <span className="text-foreground">
-                    {displayScan.isNew ? "less than a minute (demo)" : "a few minutes"}
+                    {displayScan.isNew ? "less than a minute" : "a few minutes"}
                   </span>
                 </span>
               </div>
@@ -662,10 +662,12 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                   )}
                 </div>
                 <div className="mt-8">
-                  <Notice>
-                    Frontend demo: the pipeline is simulated. No repository
-                    content is executed or analyzed.
-                  </Notice>
+                  {!isLive && (
+                    <Notice>
+                      Frontend demo: the pipeline is simulated. No repository
+                      content is executed or analyzed.
+                    </Notice>
+                  )}
                 </div>
               </div>
             </div>

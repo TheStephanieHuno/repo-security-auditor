@@ -68,6 +68,7 @@ import {
   StatusBadge,
 } from "./components"
 import { useRepositories, useScans, useFindings, useCreateRepository } from "@/lib/api/hooks"
+import { api, isLive } from "@/lib/api/index"
 
 export function RepositoryList() {
   const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
@@ -394,35 +395,44 @@ export function AddRepository() {
   const [scenario, setScenario] = useState(params.get("state") || "success")
   const [github, setGithub] = useState(false)
   const [permissionConfirmed, setPermissionConfirmed] = useState(false)
-  function validate() {
-    const match = url
-      .trim()
-      .match(/^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/)
-    if (!match) {
-      setState("invalid")
-      return
+  async function validate() {
+    const trimmed = url.trim()
+    if (!isLive) {
+      const match = trimmed.match(
+        /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/,
+      )
+      if (!match) {
+        setState("invalid")
+        return
+      }
     }
     setState("loading")
-    setTimeout(() => {
-      if (["missing", "denied", "unsupported", "offline"].includes(scenario)) {
+    try {
+      const result = await api.validateRepository({ url: trimmed })
+      if (!isLive && ["missing", "denied", "unsupported", "offline"].includes(scenario)) {
         setState(scenario)
         return
       }
-      const name = `${match[1]}/${match[2]}`
+      if (!result.accessible) {
+        setState("offline")
+        return
+      }
+      const name = result.name || trimmed.replace(/\.git\/?$/, "").replace(/^https:\/\/github\.com\//, "")
       const existing = repositories.find(
         (repo) => repo.name.toLowerCase() === name.toLowerCase(),
       )
+      const [owner] = name.split("/")
       setPreview(
         existing || {
-          id: `${match[1]}-${match[2]}-${crypto.randomUUID().slice(0, 8)}`.toLowerCase(),
-          owner: match[1],
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          owner: owner || name,
           url: `https://github.com/${name}`,
           name,
-          description: "Newly connected GitHub repository",
-          language: "TypeScript",
-          branch: "main",
-          commit: "f4a20b8",
-          visibility: "Private",
+          description: result.description || "Newly connected GitHub repository",
+          language: result.language || "TypeScript",
+          branch: result.branch || "main",
+          commit: result.commit || "—",
+          visibility: result.visibility || "Private",
           connected: new Date().toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -432,7 +442,9 @@ export function AddRepository() {
         },
       )
       setState("success")
-    }, 1000)
+    } catch {
+      setState("offline")
+    }
   }
   return (
     <>
@@ -505,7 +517,9 @@ export function AddRepository() {
                 </Button>
               </div>
               <p id="repo-hint" className="mt-2 text-xs text-muted-foreground">
-                For the demo, try https://github.com/Amalitech/payment-service.
+                {isLive
+                  ? "Enter a https://github.com/organization/repository URL."
+                  : "For the demo, try https://github.com/Amalitech/payment-service."}
               </p>
             </form>
             {validationMessages[state] && (
@@ -553,8 +567,9 @@ export function AddRepository() {
             {state === "success" && preview && (
               <div className="space-y-4">
                 <Notice title="Repository validated" tone="success">
-                  Repository exists in the demo · Access confirmed in sample
-                  data · Supported project · Ready to scan
+                  {isLive
+                    ? "Repository validated · Access confirmed · Supported project · Ready to scan"
+                    : "Repository exists in the demo · Access confirmed in sample data · Supported project · Ready to scan"}
                 </Notice>
                 <div className="rounded-lg border p-5">
                   <RepoIdentity repo={preview} subtitle />
@@ -580,7 +595,7 @@ export function AddRepository() {
                     <div>
                       <p className="text-muted-foreground">Latest commit</p>
                       <p className="mt-1.5 font-mono">
-                        {preview.commit} · demo
+                        {preview.commit}
                       </p>
                     </div>
                   </div>
@@ -594,7 +609,9 @@ export function AddRepository() {
                     aria-label="Confirm repository permission"
                   />
                   I have permission to submit and analyze this repository.
-                  Access validation is simulated in this frontend preview.
+                  {isLive
+                    ? "Access is validated against the live API."
+                    : "Access validation is simulated in this frontend preview."}
                 </label>
                 <Button
                   disabled={!permissionConfirmed}
@@ -603,8 +620,9 @@ export function AddRepository() {
                     const exists = repositories.some(
                       (repo) => repo.id === preview.id,
                     )
+                    let created = preview
                     if (!exists) {
-                      await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
+                      created = await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
                     }
                     toast.success(
                       exists
@@ -612,7 +630,7 @@ export function AddRepository() {
                         : "Repository connected",
                       { description: preview.name },
                     )
-                    navigate(`/repositories/${preview.id}`)
+                    navigate(`/repositories/${created.id ?? preview.id}`)
                   }}
                 >
                   {repositories.some((repo) => repo.id === preview.id)

@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useRepositories, useScans, useFindings } from "@/lib/api/hooks"
+import { useRepositories, useScans, useFindings, useGitHubStatus } from "@/lib/api/hooks"
 import { categories, getWorkspaceFindings, getScanFindings } from "@/lib/security-model"
 import {
   categoryIcons,
@@ -49,6 +49,7 @@ export function Dashboard() {
   const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
   const { data: scansData, isLoading: sLoading } = useScans(1, 100)
   const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  const { data: isGitHubConnected } = useGitHubStatus()
   const [scanOpen, setScanOpen] = useState(false)
 
   if (rLoading || sLoading || fLoading) {
@@ -95,9 +96,14 @@ export function Dashboard() {
       findingRecord.severity === "Critical" ||
       findingRecord.severity === "High",
   )
-  const latestCompleted = scans.find((scan) => scan.status === "Completed")
+  const latestScan = scans.find(
+    (scan) =>
+      scan.status === "Completed" ||
+      scan.status === "Partial" ||
+      scan.status === "Failed",
+  )
   const latestRepository = repositories.find(
-    (repo) => repo.id === latestCompleted?.repoId,
+    (repo) => repo.id === latestScan?.repoId,
   )
   const metrics = [
     {
@@ -105,10 +111,15 @@ export function Dashboard() {
       value: repositories.length,
       icon: FolderGit2,
       detail: "Across your workspace",
-      extra: (
+      extra: isGitHubConnected?.connected ? (
         <span className="flex items-center gap-1 text-trust">
           <CheckCircle2 className="size-3" />
           GitHub connected
+        </span>
+      ) : (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <CircleAlert className="size-3" />
+          GitHub not connected
         </span>
       ),
     },
@@ -146,19 +157,23 @@ export function Dashboard() {
       ),
     },
     {
-      label: "Last completed scan",
-      value:
-        scans.find((scanRecord) => scanRecord.status === "Completed")
-          ?.relative || "No scans",
+      label: "Last scan result",
+      value: latestScan?.relative || "No scans",
       icon: Clock3,
       detail: latestRepository
         ? `${latestRepository.name} · ${latestRepository.branch}`
         : "Run your first scan",
-      extra: (
+      extra: latestScan ? (
         <span className="flex items-center gap-1 text-trust">
           <span className="size-1.5 rounded-full bg-trust" />
-          All checks completed
+          {latestScan.status === "Completed"
+            ? "All checks completed"
+            : latestScan.status === "Partial"
+              ? "Partial results"
+              : "Scan failed"}
         </span>
+      ) : (
+        <span className="text-muted-foreground">Run your first scan</span>
       ),
     },
   ]
@@ -170,7 +185,12 @@ export function Dashboard() {
         </p>
         <span className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
           <CalendarDays className="size-3.5" />
-          Thursday, October 1, 2026
+          {new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })}
         </span>
       </div>
       <PageHeader

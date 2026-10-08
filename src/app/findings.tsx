@@ -71,7 +71,6 @@ import {
   StatusBadge,
 } from "./components"
 import { useRepositories, useScans, useFindings, useFinding, useScanFindings, useUpdateFinding } from "@/lib/api/hooks"
-import { toTitleCase } from "@/lib/api/index"
 import type { FindingQuery } from "@/types"
 
 type FindingDetail = Finding & { aiExplanation?: string }
@@ -120,7 +119,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
   if (search) query.search = search
   if (severity !== "All severities") query.severity = severity
   if (category !== "All categories") query.category = category
-  if (status !== "All statuses") query.status = toTitleCase(status)
+  if (status !== "All statuses") query.status = status
   if (backendScanner) query.scanner = backendScanner
   
   const { data: workspaceData, isLoading: wLoading } = useFindings(scanId === "all" ? query : ({ enabled: false } as FindingQuery))
@@ -1204,7 +1203,7 @@ export function FindingDetail() {
                 try {
                   await updateFinding({
                     id: finding.id,
-                    body: { status: toTitleCase(selectedStatus), review_note: reason },
+                    body: { status: selectedStatus, review_note: reason },
                   })
                   setStatusOpen(false)
                   setReason("")

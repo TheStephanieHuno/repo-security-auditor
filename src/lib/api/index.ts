@@ -40,6 +40,7 @@ import { apiClient, setAuthToken } from "./client"
 import { endpoints } from "./endpoints"
 
 const isLive = process.env.NEXT_PUBLIC_API_MODE === "live"
+export { isLive }
 
 interface ApiRepository {
   id: string
@@ -79,6 +80,7 @@ interface ApiFinding {
   lineStart?: number
   description?: string
   codeSnippet?: string
+  scanner?: string
   recommendation?: string
   reviewStatus?: string
   reviewNote?: string
@@ -126,6 +128,27 @@ export function toTitleCase(str?: string) {
   if (str === "Open") return "open"
   if (str === "Resolved") return "resolved"
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+
+function toReviewStatus(value?: string): string | undefined {
+  if (!value) return undefined
+  const normalized = value.toLowerCase().replace(/-/g, " ")
+  if (normalized === "false positive" || normalized === "false_positive") return "false_positive"
+  if (normalized === "acknowledged" || normalized === "reviewed") return "acknowledged"
+  if (normalized === "resolved") return "resolved"
+  if (normalized === "open") return "open"
+  return value
+}
+
+function appendFindingFilters(qs: URLSearchParams, query: FindingQuery) {
+  if (query.severity) qs.append("severity", query.severity)
+  if (query.category) qs.append("category", query.category)
+  if (query.status) {
+    const reviewStatus = toReviewStatus(query.status)
+    if (reviewStatus) qs.append("reviewStatus", reviewStatus)
+  }
+  if (query.scanner) qs.append("scanner", query.scanner)
+  if (query.search) qs.append("search", query.search)
 }
 
 function computeRelative(dateStr?: string) {
@@ -182,7 +205,7 @@ function mapFinding(f: ApiFinding): Finding & { aiExplanation?: string } {
     confidence: (toTitleCase(f.confidence) || "Medium") as Finding["confidence"],
     file: f.filePath || "—",
     line: f.lineStart || 1,
-    scanner: "—",
+    scanner: toTitleCase(f.scanner) || "—",
     rule: f.title,
     description: f.description || "",
     evidence: f.codeSnippet || "",
@@ -389,7 +412,7 @@ export const api = {
       const qs = new URLSearchParams()
       if (query.page) qs.append("page", query.page.toString())
       if (query.page_size) qs.append("pageSize", query.page_size.toString())
-      if (query.severity) qs.append("severity", query.severity)
+      appendFindingFilters(qs, query)
       return apiClient.get<Paginated<ApiFinding>>(`${endpoints.scans.findings(scanId)}?${qs.toString()}`)
         .then(res => ({ ...res, items: res.items.map(mapFinding) }))
     }
@@ -404,7 +427,7 @@ export const api = {
       if (query.page_size) qs.append("pageSize", query.page_size.toString())
       if (query.scan_id) qs.append("scanId", query.scan_id)
       if (query.repo_id) qs.append("repositoryId", query.repo_id)
-      if (query.severity) qs.append("severity", query.severity)
+      appendFindingFilters(qs, query)
       return apiClient.get<Paginated<ApiFinding>>(`${endpoints.findings.list}?${qs.toString()}`)
         .then(res => ({ ...res, items: res.items.map(mapFinding) }))
     }
@@ -420,14 +443,8 @@ export const api = {
 
   updateFinding: (id: string, body: FindingUpdate): Promise<Finding> => {
     if (isLive) {
-      // Map UI reviewStatus to backend enum
-      let reviewStatus = "open"
-      if (body.status === "False positive") reviewStatus = "false_positive"
-      else if (body.status === "Reviewed") reviewStatus = "acknowledged"
-      else if (body.status === "Resolved") reviewStatus = "resolved"
-
       return apiClient.patch<ApiFinding>(endpoints.findings.detail(id), {
-        reviewStatus,
+        reviewStatus: toReviewStatus(body.status) ?? "open",
         reviewNote: body.review_note
       }).then(mapFinding)
     }

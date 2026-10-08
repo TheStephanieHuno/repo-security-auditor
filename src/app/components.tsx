@@ -54,6 +54,7 @@ import {
   type Severity,
 } from "@/lib/security-model"
 import { useRepositories, useTriggerScan, useGitHubStatus, useRepositoryBranches, useScans, useFindings, useCancelScan } from "@/lib/api/hooks"
+import { isLive } from "@/lib/api/index"
 import { useDownloadReportPdf, useGenerateReport, useReport } from "@/lib/api/hooks"
 import { getScanOutcome, scanOutcomeLabels } from "@/lib/scan-status"
 
@@ -808,17 +809,19 @@ export function ScanDialog({
             isolated environment. Analysis may take several minutes depending on
             repository size.
           </Notice>
-          <p className="text-xs text-muted-foreground">
-            Frontend demo: progress is simulated. No repository is cloned or
-            scanned.
-          </p>
+          {!isLive && (
+            <p className="text-xs text-muted-foreground">
+              Frontend demo: progress is simulated. No repository is cloned or
+              scanned.
+            </p>
+          )}
           {error && (
             <Notice title="Scan could not be created" tone="error">
               The scan queue could not be reached. Previous scan results are
               still available. Retry after restoring the connection.
             </Notice>
           )}
-          {githubError && (
+          {!isLive && githubError && (
             <Notice
               tone="error"
               title="GitHub is disconnected"
@@ -840,7 +843,7 @@ export function ScanDialog({
           <Button
             disabled={launching || (!repo && !selected)}
             onClick={async () => {
-              if (isGitHubConnected?.connected === false) {
+              if (!isLive && isGitHubConnected?.connected === false) {
                 setGithubError(true)
                 return
               }
