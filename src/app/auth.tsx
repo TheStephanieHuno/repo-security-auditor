@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Heading, Notice } from "./components"
 import { useLogin, useRegister, useSession, useRequestPasswordReset, useConfirmPasswordReset } from "@/lib/api/hooks"
+import { validatePasswordStrength } from "@/lib/password"
 
 export function Login() {
   const devToolsEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "true"
@@ -278,7 +279,10 @@ export function Login() {
 const signUpSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
   email: z.string().trim().email("Enter a valid email address."),
-  password: z.string().min(8, "Use at least 8 characters."),
+  password: z.string().superRefine((v, ctx) => {
+    const result = validatePasswordStrength(v)
+    if (result !== true) ctx.addIssue({ code: "custom", message: result })
+  }),
   confirmPassword: z.string(),
 }).refine((values) => values.password === values.confirmPassword, { path: ["confirmPassword"], message: "Passwords must match." })
 type SignUpValues = z.infer<typeof signUpSchema>
@@ -325,7 +329,10 @@ export function SignUp() {
 }
 
 const resetSchema = z.object({
-  password: z.string().min(8, "Use at least 8 characters."),
+  password: z.string().superRefine((v, ctx) => {
+    const result = validatePasswordStrength(v)
+    if (result !== true) ctx.addIssue({ code: "custom", message: result })
+  }),
   confirmPassword: z.string(),
 }).refine((values) => values.password === values.confirmPassword, { path: ["confirmPassword"], message: "Passwords must match." })
 type ResetValues = z.infer<typeof resetSchema>

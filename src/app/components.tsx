@@ -892,17 +892,44 @@ export function DownloadReport({
   const { mutateAsync: generate } = useGenerateReport()
   const { mutateAsync: downloadPdf, isPending } = useDownloadReportPdf()
   const { data: existing } = useReport(scanId)
-  async function download() { try { const report = existing?.status === "ready" ? existing : await generate({ scan_id: scanId }); const blob = await downloadPdf(report.id); const url = URL.createObjectURL(blob); const element = document.createElement("a"); element.href = url; element.download = report.file_name; element.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast.success("PDF report downloaded") } catch (error) { toast.error(error instanceof Error ? error.message : "Could not download the PDF.") } }
+
+  async function download() {
+    try {
+      let report = existing
+      if (report?.status !== "ready") {
+        report = await generate({ scan_id: scanId })
+        if (report.status === "generating") {
+          toast.success("Report generation started. It will be available shortly.")
+          return
+        }
+      }
+      const blob = await downloadPdf(report.id)
+      const url = URL.createObjectURL(blob)
+      const element = document.createElement("a")
+      element.href = url
+      element.download = report.file_name || "report.pdf"
+      element.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      toast.success("PDF report downloaded")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not download the PDF.")
+    }
+  }
+
   return (
     <>
       <Button
         variant={variant}
         className="h-9 gap-2"
         onClick={download}
-        disabled={isPending}
+        disabled={isPending || existing?.status === "generating"}
       >
-        {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-        Download PDF
+        {isPending || existing?.status === "generating" ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Download className="size-3.5" />
+        )}
+        {existing?.status === "generating" ? "Generating…" : "Download PDF"}
       </Button>
     </>
   )
@@ -913,14 +940,16 @@ export function CancelScanDialog({ scanId, open, onOpenChange }: { scanId: strin
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cancel this scan?</DialogTitle><DialogDescription>Results found so far will not be saved.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={isPending} onClick={() => onOpenChange(false)}>Keep scanning</Button><Button variant="destructive" disabled={isPending} onClick={async () => { try { await cancel(scanId); toast.success("Scan cancelled") ; onOpenChange(false) } catch (error) { toast.error(error instanceof Error ? error.message : "Could not cancel scan.") } }}>{isPending ? "Cancelling…" : "Cancel scan"}</Button></DialogFooter></DialogContent></Dialog>
 }
 
-export function ReportPreview({ reportId, enabled }: { reportId: string; enabled: boolean }) {
+export function ReportPreview({ reportId, enabled }: { reportId?: string; enabled: boolean }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { mutateAsync: download, isPending } = useDownloadReportPdf()
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !reportId) return
     let active = true
-    download(reportId).then((blob) => { if (active) setUrl(URL.createObjectURL(blob)) }).catch(() => { if (active) setError("Preview unavailable. Download the PDF instead.") })
+    download(reportId)
+      .then((blob) => { if (active) setUrl(URL.createObjectURL(blob)) })
+      .catch((err) => { if (active) setError(err instanceof Error ? err.message : "Preview unavailable. Download the PDF instead.") })
     return () => { active = false; setUrl((current) => { if (current) URL.revokeObjectURL(current); return null }) }
   }, [download, enabled, reportId])
   if (!enabled) return null

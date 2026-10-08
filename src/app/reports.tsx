@@ -346,7 +346,7 @@ export function ReportDetail() {
           </div>
         </div>
       </Panel>
-      <ReportPreview reportId={scan.id} enabled={report?.status === "ready"} />
+      <ReportPreview reportId={report?.id} enabled={report?.status === "ready"} />
       {scan.status === "Partial" && (
         <div className="mt-5">
           <Notice title="Incomplete scanner coverage" tone="warning">

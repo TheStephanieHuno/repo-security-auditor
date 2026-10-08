@@ -271,11 +271,15 @@ export function useReports(page = 1, pageSize = 50) {
   })
 }
 
-export function useReport(id: string) {
+export function useReport(scanId: string) {
   return useQuery({
-    queryKey: queryKeys.report(id),
-    queryFn: () => api.getReport(id),
-    enabled: !!id,
+    queryKey: queryKeys.report(scanId),
+    queryFn: async () => {
+      const res = await api.getReports(1, 1, scanId)
+      // Since mock mode doesn't filter by scanId in getReports automatically
+      return res.items.find((r: any) => r.scan_id === scanId) || null
+    },
+    enabled: !!scanId,
     refetchInterval: (query) => query.state.data?.status === "generating" ? 1000 : false,
   })
 }
@@ -288,8 +292,9 @@ export function useGenerateReport() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: ReportCreate) => api.generateReport(body),
-    onSuccess: () => {
+    onSuccess: (data, body) => {
       qc.invalidateQueries({ queryKey: queryKeys.reports() })
+      qc.invalidateQueries({ queryKey: queryKeys.report(body.scan_id) })
     },
   })
 }

@@ -142,7 +142,22 @@ export const apiClient = {
     if (token) headers["Authorization"] = `Bearer ${token}`
 
     const response = await fetch(`${baseUrl}${path}`, { method: "GET", credentials: "omit", headers })
-    if (!response.ok) throw new ApiError(response.status, response.statusText, "Could not download the PDF.")
+    if (!response.ok) {
+      let message = "Could not download the PDF."
+      let details: any[] | undefined
+      try {
+        const errBody = await response.json()
+        if (errBody?.error?.message) {
+          message = errBody.error.message
+          details = errBody.error.details
+        } else {
+          message = errBody?.detail ?? errBody?.message ?? message
+        }
+      } catch {
+        // use default message if parsing fails
+      }
+      throw new ApiError(response.status, response.statusText, message, details)
+    }
     return response.blob()
   },
 }

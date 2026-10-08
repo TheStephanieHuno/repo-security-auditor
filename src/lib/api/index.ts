@@ -35,6 +35,11 @@ const isLive = process.env.NEXT_PUBLIC_API_MODE === "live"
 export function toTitleCase(str?: string) {
   if (!str) return ""
   if (str === "false_positive") return "False positive"
+  if (str === "acknowledged") return "Reviewed"
+  if (str === "False positive") return "false_positive"
+  if (str === "Reviewed") return "acknowledged"
+  if (str === "Open") return "open"
+  if (str === "Resolved") return "resolved"
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
@@ -81,7 +86,7 @@ function mapScan(s: any): Scan {
   }
 }
 
-function mapFinding(f: any): Finding {
+function mapFinding(f: any): Finding & { aiExplanation?: string } {
   return {
     id: f.id,
     repoId: f.repositoryId,
@@ -101,6 +106,8 @@ function mapFinding(f: any): Finding {
     impact: "",
     status: toTitleCase(f.reviewStatus) as any || "Open",
     reviewNote: f.reviewNote,
+    aiExplanation: f.aiExplanation || "",
+    aiState: f.aiExplanation ? undefined : "unavailable"
   }
 }
 
@@ -332,12 +339,16 @@ export const api = {
   },
 
   // ─── Reports ───────────────────────────────────────────────────────────────
-  getReports: (page = 1, page_size = 50): Promise<Paginated<Scan>> => {
+  getReports: (page = 1, page_size = 50, scanId?: string): Promise<Paginated<Report>> => {
     if (isLive) {
-      return apiClient.get<Paginated<any>>(`${endpoints.reports.list}?page=${page}&pageSize=${page_size}`)
+      const q = new URLSearchParams()
+      q.set("page", page.toString())
+      q.set("pageSize", page_size.toString())
+      if (scanId) q.set("scanId", scanId)
+      return apiClient.get<Paginated<any>>(`${endpoints.reports.list}?${q.toString()}`)
         .then(res => ({ ...res, items: res.items.map(r => ({ id: r.id, scan_id: r.scanId, status: r.status, file_name: r.fileUrl || "report.pdf" }) as any) }))
     }
-    return mock.mockGetReports(page, page_size)
+    return mock.mockGetReports(page, page_size) as unknown as Promise<Paginated<Report>>
   },
 
   getReport: (id: string): Promise<Report> => {

@@ -69,7 +69,8 @@ import {
   SeverityBadge,
   StatusBadge,
 } from "./components"
-import { useRepositories, useScans, useFindings, useUpdateFinding } from "@/lib/api/hooks"
+import { useRepositories, useScans, useFindings, useFinding, useScanFindings, useUpdateFinding } from "@/lib/api/hooks"
+import { toTitleCase } from "@/lib/api/index"
 
 export function WorkspaceFindings() {
   return (
@@ -87,12 +88,7 @@ export function WorkspaceFindings() {
 export function FindingsList({ scanId }: { scanId: string }) {
   const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
   const { data: scansData, isLoading: sLoading } = useScans(1, 100)
-  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
-  const repositories = reposData?.items || []
-  const scans = scansData?.items || []
-  const allFindings = findingsData?.items || []
   const [params] = useSearchParams()
-  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
   const [search, setSearch] = useState("")
   const [severity, setSeverity] = useState("All severities")
   const [category, setCategory] = useState(
@@ -107,29 +103,40 @@ export function FindingsList({ scanId }: { scanId: string }) {
   const [page, setPage] = useState(1)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [multi, setMulti] = useState<string[]>([])
-  const all =
-    scanId === "all"
-      ? getWorkspaceFindings(scans, allFindings)
-      : getScanFindings(scan, allFindings)
-  const filtered = all
-    .filter(
-      (findingRecord) =>
-        `${findingRecord.title} ${findingRecord.file} ${findingRecord.description}`
-          .toLowerCase()
-          .includes(search.toLowerCase()) &&
-        (severity === "All severities" ||
-          findingRecord.severity === severity) &&
-        (category === "All categories" ||
-          findingRecord.category === category) &&
-        (scanner === "All methods" ||
-          // scanner state holds a description; find the matching tool name
-          (scannerLabel[findingRecord.scanner] ?? findingRecord.scanner) === scanner) &&
-        (status === "All statuses" || findingRecord.status === status) &&
-        (confidence === "All confidence" ||
-          findingRecord.confidence === confidence) &&
-        (multi.length === 0 || multi.includes(findingRecord.severity)),
+  const pageSize = 8
+
+  // Map UI scanner description back to backend value
+  let backendScanner: string | undefined
+  if (scanner !== "All methods") {
+    const info = scannerInfo.find(s => s.description === scanner)
+    if (info) backendScanner = info.name
+  }
+
+  const query: any = { page, page_size: pageSize }
+  if (search) query.search = search
+  if (severity !== "All severities") query.severity = severity
+  if (category !== "All categories") query.category = category
+  if (status !== "All statuses") query.status = toTitleCase(status)
+  if (backendScanner) query.scanner = backendScanner
+  
+  const { data: workspaceData, isLoading: wLoading } = useFindings(scanId === "all" ? query : { enabled: false } as any)
+  const { data: scanFindingsData, isLoading: sfLoading } = useScanFindings(scanId !== "all" ? scanId : "", scanId !== "all" ? query : { enabled: false } as any)
+  
+  const findingsData = scanId === "all" ? workspaceData : scanFindingsData
+  const fLoading = scanId === "all" ? wLoading : sfLoading
+
+  const repositories = reposData?.items || []
+  const scans = scansData?.items || []
+  const allFindings = findingsData?.items || []
+  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
+
+  // Apply client-side filters for properties the backend doesn't support
+  const filtered = allFindings
+    .filter((findingRecord: any) => 
+      (confidence === "All confidence" || findingRecord.confidence === confidence) &&
+      (multi.length === 0 || multi.includes(findingRecord.severity))
     )
-    .sort((first, second) =>
+    .sort((first: any, second: any) =>
       sort === "Severity"
         ? severityOrder.indexOf(first.severity) -
           severityOrder.indexOf(second.severity)
@@ -142,10 +149,12 @@ export function FindingsList({ scanId }: { scanId: string }) {
               ? capturedAt(first.repoId) - capturedAt(second.repoId)
               : capturedAt(second.repoId) - capturedAt(first.repoId),
     )
+
   useEffect(() => {
     setPage(1)
   }, [search, severity, category, scanner, status, confidence, sort, multi])
-  function findingPath(finding: typeof all[number]) {
+
+  function findingPath(finding: any) {
     const latest = scans.find(
       (item) =>
         item.repoId === finding.repoId &&
@@ -155,6 +164,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
       scanId === "all" ? finding.scanId || latest?.id : scanId
     }/findings/${finding.id}`
   }
+
   function capturedAt(repoId: string) {
     const capture =
       scan ||
@@ -168,9 +178,11 @@ export function FindingsList({ scanId }: { scanId: string }) {
     )
     return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER
   }
-  const pageSize = 8
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const list = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  const totalPages = findingsData?.total ? Math.ceil(findingsData.total / pageSize) : 1
+  const list = filtered
+  const totalFindingsCount = findingsData?.total || 0
+  const all = new Array(totalFindingsCount) // to satisfy all.length checks in UI
   const filterCount = [
     severity !== "All severities",
     category !== "All categories",
@@ -562,25 +574,29 @@ export function FindingDetail() {
   const { id: scanId, findingId } = useParams()
   const { data: reposData, isLoading: rLoading } = useRepositories(1, 100)
   const { data: scansData, isLoading: sLoading } = useScans(1, 100)
-  const { data: findingsData, isLoading: fLoading } = useFindings({ page_size: 1000 })
+  
+  // Use specific endpoint for single finding
+  const { data: findingData, isLoading: fLoading } = useFinding(findingId || "")
   const repositories = reposData?.items || []
   const scans = scansData?.items || []
-  const allFindings = findingsData?.items || []
-  const { mutateAsync: updateFinding } = useUpdateFinding()
+  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
+  
+  // Fetch real related findings from backend scan findings (up to 3)
+  const { data: relatedData } = useScanFindings(scanId || "", { page_size: 4 })
+  
+  const finding = findingData as any
+  const related = (relatedData?.items || []).filter((f: any) => f.id !== findingId).slice(0, 3)
+
+  const { mutateAsync: updateFinding, isPending: isUpdating, error: updateError } = useUpdateFinding()
   const [params] = useSearchParams()
   const [statusOpen, setStatusOpen] = useState(false)
   const [selectedStatus, setSelectedStatus] =
-    useState<FindingStatus>("Reviewed")
+    useState<any>("Reviewed")
   const [reason, setReason] = useState("")
   const [aiRetried, setAiRetried] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [activeSection, setActiveSection] = useState("evidence")
   const [contextIndex, setContextIndex] = useState(0)
-  const scan = scans.find((scanRecord) => scanRecord.id === scanId)
-  const finding = getScanFindings(scan, allFindings).find(
-    (findingRecord) =>
-      findingRecord.id === findingId && findingRecord.repoId === scan?.repoId,
-  )
   const repo = repositories.find(
     (repositoryRecord) => repositoryRecord.id === scan?.repoId,
   )
@@ -597,14 +613,7 @@ export function FindingDetail() {
       </div>
     )
   }
-  if (
-    !finding ||
-    !repo ||
-    !scan ||
-    !getScanFindings(scan, allFindings).some(
-      (item) => item.id === finding.id,
-    )
-  )
+  if (!finding || !repo || !scan)
     return (
       <EmptyState
         title="Finding not found"
@@ -612,15 +621,6 @@ export function FindingDetail() {
         action={<LinkButton to="/scans">Back to scans</LinkButton>}
       />
     )
-  const related = getScanFindings(scan, allFindings)
-    .filter(
-      (findingRecord) =>
-        findingRecord.id !== finding.id &&
-        findingRecord.repoId === finding.repoId &&
-        (findingRecord.category === finding.category ||
-          findingRecord.scanner === finding.scanner),
-    )
-    .slice(0, 3)
   const aiUnavailable =
     !aiRetried &&
     (finding.aiState === "unavailable" || params.get("state") === "ai-error")
@@ -924,31 +924,11 @@ export function FindingDetail() {
                   <div className="space-y-5">
                     <div>
                       <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
-                        <ShieldCheck className="size-3.5 text-trust" />
-                        What is verified
+                        <Sparkles className="size-3.5 text-trust" />
+                        AI Explanation
                       </p>
-                      <p className="text-sm leading-7 text-muted-foreground">
-                        {finding.scanner} detected the pattern described by{" "}
-                        <span className="break-all font-mono text-xs text-foreground">
-                          {finding.rule}
-                        </span>{" "}
-                        in{" "}
-                        <span className="font-mono text-xs text-foreground">
-                          {finding.file}:{finding.line}
-                        </span>
-                        . {finding.description}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
-                        <Sparkles className="size-3.5 text-muted-foreground" />
-                        What is inferred
-                      </p>
-                      <p className="text-sm leading-7 text-muted-foreground">
-                        {finding.impact} The surrounding sample context suggests
-                        this location belongs to the application, but does not
-                        establish that the vulnerable path is reached in
-                        production.
+                      <p className="text-sm leading-7 text-muted-foreground whitespace-pre-wrap">
+                        {finding.aiExplanation || "No AI explanation was provided for this finding."}
                       </p>
                     </div>
                     <Notice
@@ -1212,22 +1192,32 @@ export function FindingDetail() {
             </Button>
             <Button
               disabled={
-                ["Resolved", "False positive"].includes(selectedStatus) &&
-                !reason.trim()
+                isUpdating ||
+                (["Resolved", "False positive"].includes(selectedStatus) &&
+                !reason.trim())
               }
               onClick={async () => {
-                await updateFinding({
-                  id: finding.id,
-                  body: { status: selectedStatus, review_note: reason },
-                })
-                setStatusOpen(false)
-                setReason("")
+                try {
+                  await updateFinding({
+                    id: finding.id,
+                    body: { status: toTitleCase(selectedStatus), review_note: reason },
+                  })
+                  setStatusOpen(false)
+                  setReason("")
+                } catch (e) {
+                  // Keep UI on real status if error
+                }
               }}
             >
-              <Check className="size-3.5" />
-              Save status
+              {isUpdating ? <RotateCcw className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+              {isUpdating ? "Saving..." : "Save status"}
             </Button>
           </DialogFooter>
+          {updateError && (
+            <div className="px-6 pb-4">
+               <Notice tone="warning" title="Update failed">{(updateError as any).message || "An error occurred while updating the finding."}</Notice>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </PageState>
