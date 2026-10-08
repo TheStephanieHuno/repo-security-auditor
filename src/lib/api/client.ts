@@ -75,7 +75,7 @@ async function request<T>(
     }
 
     let message = response.statusText
-    let details: any[] | undefined
+    let details: { field?: string; message?: string }[] | undefined
     try {
       const errBody = await response.json()
       if (errBody?.error?.message) {
@@ -144,7 +144,7 @@ export const apiClient = {
     const response = await fetch(`${baseUrl}${path}`, { method: "GET", credentials: "omit", headers })
     if (!response.ok) {
       let message = "Could not download the PDF."
-      let details: any[] | undefined
+      let details: { field?: string; message?: string }[] | undefined
       try {
         const errBody = await response.json()
         if (errBody?.error?.message) {

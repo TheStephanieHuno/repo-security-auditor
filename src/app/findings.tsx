@@ -44,6 +44,7 @@ import {
   getFindingContext,
   scannerInfo,
   severityOrder,
+  type Finding,
   type FindingStatus,
 } from "@/lib/security-model"
 
@@ -71,6 +72,9 @@ import {
 } from "./components"
 import { useRepositories, useScans, useFindings, useFinding, useScanFindings, useUpdateFinding } from "@/lib/api/hooks"
 import { toTitleCase } from "@/lib/api/index"
+import type { FindingQuery } from "@/types"
+
+type FindingDetail = Finding & { aiExplanation?: string }
 
 export function WorkspaceFindings() {
   return (
@@ -112,15 +116,15 @@ export function FindingsList({ scanId }: { scanId: string }) {
     if (info) backendScanner = info.name
   }
 
-  const query: any = { page, page_size: pageSize }
+  const query: FindingQuery = { page, page_size: pageSize }
   if (search) query.search = search
   if (severity !== "All severities") query.severity = severity
   if (category !== "All categories") query.category = category
   if (status !== "All statuses") query.status = toTitleCase(status)
   if (backendScanner) query.scanner = backendScanner
   
-  const { data: workspaceData, isLoading: wLoading } = useFindings(scanId === "all" ? query : { enabled: false } as any)
-  const { data: scanFindingsData, isLoading: sfLoading } = useScanFindings(scanId !== "all" ? scanId : "", scanId !== "all" ? query : { enabled: false } as any)
+  const { data: workspaceData, isLoading: wLoading } = useFindings(scanId === "all" ? query : ({ enabled: false } as FindingQuery))
+  const { data: scanFindingsData, isLoading: sfLoading } = useScanFindings(scanId !== "all" ? scanId : "", scanId !== "all" ? query : ({ enabled: false } as FindingQuery))
   
   const findingsData = scanId === "all" ? workspaceData : scanFindingsData
   const fLoading = scanId === "all" ? wLoading : sfLoading
@@ -132,11 +136,11 @@ export function FindingsList({ scanId }: { scanId: string }) {
 
   // Apply client-side filters for properties the backend doesn't support
   const filtered = allFindings
-    .filter((findingRecord: any) => 
+    .filter((findingRecord) => 
       (confidence === "All confidence" || findingRecord.confidence === confidence) &&
       (multi.length === 0 || multi.includes(findingRecord.severity))
     )
-    .sort((first: any, second: any) =>
+    .sort((first, second) =>
       sort === "Severity"
         ? severityOrder.indexOf(first.severity) -
           severityOrder.indexOf(second.severity)
@@ -154,7 +158,7 @@ export function FindingsList({ scanId }: { scanId: string }) {
     setPage(1)
   }, [search, severity, category, scanner, status, confidence, sort, multi])
 
-  function findingPath(finding: any) {
+  function findingPath(finding: Finding) {
     const latest = scans.find(
       (item) =>
         item.repoId === finding.repoId &&
@@ -584,14 +588,14 @@ export function FindingDetail() {
   // Fetch real related findings from backend scan findings (up to 3)
   const { data: relatedData } = useScanFindings(scanId || "", { page_size: 4 })
   
-  const finding = findingData as any
-  const related = (relatedData?.items || []).filter((f: any) => f.id !== findingId).slice(0, 3)
+  const finding = findingData as FindingDetail | undefined
+  const related = (relatedData?.items || []).filter((f) => f.id !== findingId).slice(0, 3)
 
   const { mutateAsync: updateFinding, isPending: isUpdating, error: updateError } = useUpdateFinding()
   const [params] = useSearchParams()
   const [statusOpen, setStatusOpen] = useState(false)
   const [selectedStatus, setSelectedStatus] =
-    useState<any>("Reviewed")
+    useState<FindingStatus>("Reviewed")
   const [reason, setReason] = useState("")
   const [aiRetried, setAiRetried] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -1215,7 +1219,7 @@ export function FindingDetail() {
           </DialogFooter>
           {updateError && (
             <div className="px-6 pb-4">
-               <Notice tone="warning" title="Update failed">{(updateError as any).message || "An error occurred while updating the finding."}</Notice>
+               <Notice tone="warning" title="Update failed">{updateError.message || "An error occurred while updating the finding."}</Notice>
             </div>
           )}
         </DialogContent>

@@ -277,7 +277,7 @@ export function useReport(scanId: string) {
     queryFn: async () => {
       const res = await api.getReports(1, 1, scanId)
       // Since mock mode doesn't filter by scanId in getReports automatically
-      return res.items.find((r: any) => r.scan_id === scanId) || null
+      return res.items.find((r) => r.scan_id === scanId) || null
     },
     enabled: !!scanId,
     refetchInterval: (query) => query.state.data?.status === "generating" ? 1000 : false,

@@ -20,6 +20,7 @@ import {
 import { Heading, Notice } from "./components"
 import { useLogin, useRegister, useSession, useRequestPasswordReset, useConfirmPasswordReset } from "@/lib/api/hooks"
 import { validatePasswordStrength } from "@/lib/password"
+import { isApiError } from "@/lib/api/errors"
 
 export function Login() {
   const devToolsEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "true"
@@ -286,6 +287,7 @@ const signUpSchema = z.object({
   confirmPassword: z.string(),
 }).refine((values) => values.password === values.confirmPassword, { path: ["confirmPassword"], message: "Passwords must match." })
 type SignUpValues = z.infer<typeof signUpSchema>
+type SignUpFieldKey = "name" | "email" | "password"
 
 export function SignUp() {
   const navigate = useNavigate()
@@ -302,23 +304,19 @@ export function SignUp() {
   async function submit(values: SignUpValues) {
     try { await register({ name: values.name, email: values.email, password: values.password }); navigate(safeRedirect) }
     catch (error) { 
-      if (error && typeof error === 'object' && 'details' in error && Array.isArray((error as any).details)) {
-        let hasFieldErrors = false;
-        (error as any).details.forEach((detail: any) => {
-          if (detail.field && detail.message) {
-            // Check if it's a valid field for this form before setting
-            if (['name', 'email', 'password'].includes(detail.field)) {
-              hasFieldErrors = true;
-              // @ts-ignore - hook form set error
-              setError(detail.field as any, { type: "manual", message: detail.message });
-            }
+      if (isApiError(error) && error.details) {
+        let hasFieldErrors = false
+        error.details.forEach((detail) => {
+          if (detail.field && detail.message && (["name", "email", "password"] as const).includes(detail.field as SignUpFieldKey)) {
+            hasFieldErrors = true
+            setError(detail.field as SignUpFieldKey, { type: "manual", message: detail.message })
           }
-        });
+        })
         if (!hasFieldErrors) {
-          toast.error(error instanceof Error ? error.message : "Could not create your account.");
+          toast.error(error instanceof Error ? error.message : "Could not create your account.")
         }
       } else {
-        toast.error(error instanceof Error ? error.message : "Could not create your account.");
+        toast.error(error instanceof Error ? error.message : "Could not create your account.")
       }
     }
   }

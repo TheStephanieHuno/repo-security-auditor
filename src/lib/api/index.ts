@@ -25,12 +25,97 @@ import type {
   GithubIntegration,
   GitHubConnect,
   UserSettings,
+  User,
 } from "@/types"
-import type { Repository, Scan, Finding } from "@/app/data"
+import type {
+  Category,
+  Finding,
+  FindingStatus,
+  Repository,
+  Scan,
+  ScanStatus,
+  Severity,
+} from "@/app/data"
 import { apiClient, setAuthToken } from "./client"
 import { endpoints } from "./endpoints"
 
 const isLive = process.env.NEXT_PUBLIC_API_MODE === "live"
+
+interface ApiRepository {
+  id: string
+  name: string
+  owner?: string
+  url?: string
+  defaultBranch?: string
+  createdAt?: string
+}
+
+interface ApiBranch {
+  name: string
+  isDefault: boolean
+  lastCommit?: string
+}
+
+interface ApiScan {
+  id: string
+  repositoryId: string
+  status: string
+  createdAt?: string
+  startedAt?: string
+  completedAt?: string
+  progress?: number
+  branch?: string
+}
+
+interface ApiFinding {
+  id: string
+  repositoryId: string
+  scanId?: string
+  title: string
+  severity: string
+  category?: string
+  confidence?: string
+  filePath?: string
+  lineStart?: number
+  description?: string
+  codeSnippet?: string
+  recommendation?: string
+  reviewStatus?: string
+  reviewNote?: string
+  aiExplanation?: string
+}
+
+interface ApiValidateResult {
+  valid?: boolean
+  name?: string
+  message?: string
+  defaultBranch?: string
+}
+
+interface ApiReport {
+  id: string
+  scanId?: string
+  status: string
+  fileUrl?: string
+}
+
+interface ApiSettings {
+  onScanCompletion: boolean
+  onScanFailure: boolean
+}
+
+interface ApiDashboard {
+  repositories?: { total?: number }
+  scans?: { total?: number }
+  findings?: {
+    total?: number
+    critical?: number
+    high?: number
+    medium?: number
+    low?: number
+  }
+  recentScans?: ApiScan[]
+}
 
 export function toTitleCase(str?: string) {
   if (!str) return ""
@@ -55,7 +140,7 @@ function computeRelative(dateStr?: string) {
   return `${days} day${days > 1 ? "s" : ""} ago`
 }
 
-function mapRepo(r: any): Repository {
+function mapRepo(r: ApiRepository): Repository {
   return {
     id: r.id,
     name: r.name,
@@ -70,11 +155,11 @@ function mapRepo(r: any): Repository {
   }
 }
 
-function mapScan(s: any): Scan {
+function mapScan(s: ApiScan): Scan {
   return {
     id: s.id,
     repoId: s.repositoryId,
-    status: toTitleCase(s.status) as any,
+    status: toTitleCase(s.status) as ScanStatus,
     date: s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "",
     relative: computeRelative(s.startedAt),
     duration: "—",
@@ -86,15 +171,15 @@ function mapScan(s: any): Scan {
   }
 }
 
-function mapFinding(f: any): Finding & { aiExplanation?: string } {
+function mapFinding(f: ApiFinding): Finding & { aiExplanation?: string } {
   return {
     id: f.id,
     repoId: f.repositoryId,
     scanId: f.scanId,
     title: f.title,
-    severity: toTitleCase(f.severity) as any,
-    category: f.category || "Code",
-    confidence: toTitleCase(f.confidence) as any || "Medium",
+    severity: toTitleCase(f.severity) as Severity,
+    category: (f.category || "Code") as Category,
+    confidence: (toTitleCase(f.confidence) || "Medium") as Finding["confidence"],
     file: f.filePath || "—",
     line: f.lineStart || 1,
     scanner: "—",
@@ -104,10 +189,19 @@ function mapFinding(f: any): Finding & { aiExplanation?: string } {
     fixed: "",
     remediation: f.recommendation || "",
     impact: "",
-    status: toTitleCase(f.reviewStatus) as any || "Open",
+    status: (toTitleCase(f.reviewStatus) || "Open") as FindingStatus,
     reviewNote: f.reviewNote,
     aiExplanation: f.aiExplanation || "",
     aiState: f.aiExplanation ? undefined : "unavailable"
+  }
+}
+
+function mapReport(r: ApiReport): Report {
+  return {
+    id: r.id,
+    scan_id: r.scanId ?? "",
+    status: r.status as Report["status"],
+    file_name: r.fileUrl || "report.pdf",
   }
 }
 
@@ -115,7 +209,7 @@ export const api = {
   // ─── Auth ──────────────────────────────────────────────────────────────────
   login: async (body: LoginRequest): Promise<AuthResponse> => {
     if (isLive) {
-      const res = await apiClient.post<{ token: string; user: any }>(endpoints.auth.login, body)
+      const res = await apiClient.post<{ token: string; user: unknown }>(endpoints.auth.login, body)
       setAuthToken(res.token)
       return { access_token: res.token, token_type: "bearer" }
     }
@@ -124,7 +218,7 @@ export const api = {
 
   register: async (body: RegisterRequest): Promise<AuthResponse> => {
     if (isLive) {
-      const res = await apiClient.post<{ token: string; user: any }>(endpoints.auth.register, body)
+      const res = await apiClient.post<{ token: string; user: unknown }>(endpoints.auth.register, body)
       setAuthToken(res.token)
       return { access_token: res.token, token_type: "bearer" }
     }
@@ -143,9 +237,9 @@ export const api = {
     return mock.mockLogout()
   },
 
-  getSession: () => {
+  getSession: (): Promise<User> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.users.me).then(user => ({ ...user, authenticated: true }))
+      return apiClient.get<Omit<User, "authenticated">>(endpoints.users.me).then(user => ({ ...user, authenticated: true }))
     }
     return mock.mockGetSession()
   },
@@ -167,7 +261,7 @@ export const api = {
   // ─── Users ─────────────────────────────────────────────────────────────────
   updateProfile: (body: ProfileUpdate) => {
     if (isLive) {
-      return apiClient.put<any>(endpoints.users.me, body)
+      return apiClient.put<unknown>(endpoints.users.me, body)
     }
     return mock.mockUpdateProfile(body)
   },
@@ -186,7 +280,7 @@ export const api = {
   // ─── Repositories ──────────────────────────────────────────────────────────
   getRepositories: (page = 1, page_size = 50): Promise<Paginated<Repository>> => {
     if (isLive) {
-      return apiClient.get<Paginated<any>>(`${endpoints.repositories.list}?page=${page}&pageSize=${page_size}`)
+      return apiClient.get<Paginated<ApiRepository>>(`${endpoints.repositories.list}?page=${page}&pageSize=${page_size}`)
         .then(res => ({ ...res, items: res.items.map(mapRepo) }))
     }
     return mock.mockGetRepositories(page, page_size)
@@ -194,15 +288,15 @@ export const api = {
 
   getRepository: (id: string): Promise<Repository> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.repositories.detail(id)).then(mapRepo)
+      return apiClient.get<ApiRepository>(endpoints.repositories.detail(id)).then(mapRepo)
     }
     return mock.mockGetRepository(id)
   },
 
   getRepositoryBranches: (id: string): Promise<Branch[]> => {
     if (isLive) {
-      return apiClient.get<Branch[]>(endpoints.repositories.branches(id)).then(branches => 
-        branches.map((b: any) => ({ name: b.name, is_default: b.isDefault, last_commit_sha: b.lastCommit }))
+      return apiClient.get<ApiBranch[]>(endpoints.repositories.branches(id)).then(branches => 
+        branches.map(b => ({ name: b.name, is_default: b.isDefault, last_commit_sha: b.lastCommit }))
       )
     }
     return mock.mockGetRepositoryBranches(id)
@@ -210,15 +304,15 @@ export const api = {
 
   createRepository: (body: RepositoryCreate): Promise<Repository> => {
     if (isLive) {
-      return apiClient.post<any>(endpoints.repositories.list, body).then(mapRepo)
+      return apiClient.post<ApiRepository>(endpoints.repositories.list, body).then(mapRepo)
     }
     return mock.mockCreateRepository(body)
   },
 
   validateRepository: (body: RepositoryValidate): Promise<ValidateResponse> => {
     if (isLive) {
-      return apiClient.post<any>(endpoints.repositories.validate, body).then(res => ({
-        accessible: res.valid,
+      return apiClient.post<ApiValidateResult>(endpoints.repositories.validate, body).then(res => ({
+        accessible: res.valid ?? false,
         name: res.name,
         description: "",
         language: "",
@@ -242,9 +336,11 @@ export const api = {
   // ─── Scans ─────────────────────────────────────────────────────────────────
   getScans: (page = 1, page_size = 50, repoId?: string): Promise<Paginated<Scan>> => {
     if (isLive) {
-      let qs = `?page=${page}&pageSize=${page_size}`
-      if (repoId) qs += `&repositoryId=${repoId}`
-      return apiClient.get<Paginated<any>>(`${endpoints.scans.list}${qs}`)
+      const qs = new URLSearchParams()
+      qs.set("page", page.toString())
+      qs.set("pageSize", page_size.toString())
+      if (repoId) qs.set("repositoryId", repoId)
+      return apiClient.get<Paginated<ApiScan>>(`${endpoints.scans.list}?${qs.toString()}`)
         .then(res => ({ ...res, items: res.items.map(mapScan) }))
     }
     return mock.mockGetScans(page, page_size, repoId)
@@ -252,14 +348,14 @@ export const api = {
 
   getScan: (id: string): Promise<Scan> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.scans.detail(id)).then(mapScan)
+      return apiClient.get<ApiScan>(endpoints.scans.detail(id)).then(mapScan)
     }
     return mock.mockGetScan(id)
   },
 
   triggerScan: (body: ScanTrigger): Promise<Scan> => {
     if (isLive) {
-      return apiClient.post<any>(endpoints.scans.trigger, {
+      return apiClient.post<ApiScan>(endpoints.scans.trigger, {
         repositoryId: body.repo_id,
         branch: body.branch,
       }).then(mapScan)
@@ -271,7 +367,7 @@ export const api = {
     if (isLive) {
       // Backend status is lowercase: queued | running | completed | failed | cancelled
       // Frontend ScanStatusResult expects id, status, stage, progress
-      return apiClient.get<any>(endpoints.scans.status(id)).then(res => ({
+      return apiClient.get<{ id: string; status: string; progress?: number }>(endpoints.scans.status(id)).then(res => ({
         id: res.id,
         status: res.status,
         progress: res.progress ?? 0,
@@ -283,18 +379,18 @@ export const api = {
 
   cancelScan: (id: string): Promise<Scan> => {
     if (isLive) {
-      return apiClient.post<any>(endpoints.scans.cancel(id)).then(mapScan)
+      return apiClient.post<ApiScan>(endpoints.scans.cancel(id)).then(mapScan)
     }
     return mock.mockCancelScan(id)
   },
 
   getScanFindings: (scanId: string, query: FindingQuery = {}): Promise<Paginated<Finding>> => {
     if (isLive) {
-      let qs = new URLSearchParams()
+      const qs = new URLSearchParams()
       if (query.page) qs.append("page", query.page.toString())
       if (query.page_size) qs.append("pageSize", query.page_size.toString())
       if (query.severity) qs.append("severity", query.severity)
-      return apiClient.get<Paginated<any>>(`${endpoints.scans.findings(scanId)}?${qs.toString()}`)
+      return apiClient.get<Paginated<ApiFinding>>(`${endpoints.scans.findings(scanId)}?${qs.toString()}`)
         .then(res => ({ ...res, items: res.items.map(mapFinding) }))
     }
     return mock.mockGetScanFindings(scanId, query)
@@ -303,13 +399,13 @@ export const api = {
   // ─── Findings ──────────────────────────────────────────────────────────────
   getFindings: (query: FindingQuery = {}): Promise<Paginated<Finding>> => {
     if (isLive) {
-      let qs = new URLSearchParams()
+      const qs = new URLSearchParams()
       if (query.page) qs.append("page", query.page.toString())
       if (query.page_size) qs.append("pageSize", query.page_size.toString())
       if (query.scan_id) qs.append("scanId", query.scan_id)
       if (query.repo_id) qs.append("repositoryId", query.repo_id)
       if (query.severity) qs.append("severity", query.severity)
-      return apiClient.get<Paginated<any>>(`${endpoints.findings.list}?${qs.toString()}`)
+      return apiClient.get<Paginated<ApiFinding>>(`${endpoints.findings.list}?${qs.toString()}`)
         .then(res => ({ ...res, items: res.items.map(mapFinding) }))
     }
     return mock.mockGetFindings(query)
@@ -317,7 +413,7 @@ export const api = {
 
   getFinding: (id: string): Promise<Finding> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.findings.detail(id)).then(mapFinding)
+      return apiClient.get<ApiFinding>(endpoints.findings.detail(id)).then(mapFinding)
     }
     return mock.mockGetFinding(id)
   },
@@ -330,7 +426,7 @@ export const api = {
       else if (body.status === "Reviewed") reviewStatus = "acknowledged"
       else if (body.status === "Resolved") reviewStatus = "resolved"
 
-      return apiClient.patch<any>(endpoints.findings.detail(id), {
+      return apiClient.patch<ApiFinding>(endpoints.findings.detail(id), {
         reviewStatus,
         reviewNote: body.review_note
       }).then(mapFinding)
@@ -345,24 +441,24 @@ export const api = {
       q.set("page", page.toString())
       q.set("pageSize", page_size.toString())
       if (scanId) q.set("scanId", scanId)
-      return apiClient.get<Paginated<any>>(`${endpoints.reports.list}?${q.toString()}`)
-        .then(res => ({ ...res, items: res.items.map(r => ({ id: r.id, scan_id: r.scanId, status: r.status, file_name: r.fileUrl || "report.pdf" }) as any) }))
+      return apiClient.get<Paginated<ApiReport>>(`${endpoints.reports.list}?${q.toString()}`)
+        .then(res => ({ ...res, items: res.items.map(mapReport) }))
     }
     return mock.mockGetReports(page, page_size) as unknown as Promise<Paginated<Report>>
   },
 
   getReport: (id: string): Promise<Report> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.reports.detail(id))
-        .then(r => ({ id: r.id, scan_id: r.scanId, status: r.status, file_name: r.fileUrl || "report.pdf" } as any))
+      return apiClient.get<ApiReport>(endpoints.reports.detail(id))
+        .then(mapReport)
     }
     return mock.mockGetReport(id)
   },
 
   generateReport: (body: ReportCreate): Promise<Report> => {
     if (isLive) {
-      return apiClient.post<any>(endpoints.reports.generate, { scanId: body.scan_id })
-        .then(r => ({ id: r.id, scan_id: r.scanId, status: r.status, file_name: r.fileUrl || "report.pdf" } as any))
+      return apiClient.post<ApiReport>(endpoints.reports.generate, { scanId: body.scan_id })
+        .then(mapReport)
     }
     return mock.mockGenerateReport(body)
   },
@@ -377,7 +473,7 @@ export const api = {
   // ─── Dashboard ─────────────────────────────────────────────────────────────
   getDashboard: (): Promise<DashboardMetrics> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.dashboard.metrics).then(metrics => ({
+      return apiClient.get<ApiDashboard>(endpoints.dashboard.metrics).then(metrics => ({
         total_repositories: metrics.repositories?.total || 0,
         total_scans: metrics.scans?.total || 0,
         total_findings: metrics.findings?.total || 0,
@@ -416,7 +512,7 @@ export const api = {
 
   getSettings: (): Promise<UserSettings> => {
     if (isLive) {
-      return apiClient.get<any>(endpoints.users.settings).then(res => ({
+      return apiClient.get<ApiSettings>(endpoints.users.settings).then(res => ({
         completion: res.onScanCompletion,
         failure: res.onScanFailure
       }))
@@ -426,7 +522,7 @@ export const api = {
 
   updateSettings: (body: UserSettings): Promise<UserSettings> => {
     if (isLive) {
-      return apiClient.put<any>(endpoints.users.settings, {
+      return apiClient.put<ApiSettings>(endpoints.users.settings, {
         onScanCompletion: body.completion,
         onScanFailure: body.failure
       }).then(res => ({
