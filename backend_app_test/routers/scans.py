@@ -51,22 +51,57 @@ async def list_scans(page: int = Query(1, ge=1), pageSize: int = Query(20, ge=1,
     return ScanListResponse(status="success", data=scan_items, pagination=Pagination(page=page, pageSize=pageSize, totalItems=total_items, totalPages=total_pages))
 
 @router.post("", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
-async def start_scan(body: StartScanRequest, background_tasks: BackgroundTasks, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def start_scan(
+    body: StartScanRequest,
+    background_tasks: BackgroundTasks,
+    current_user: DBUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     repo = await verify_user_owns_repository(db, body.repositoryId, current_user)
+
     now = datetime.now(timezone.utc)
-    new_scan = DBScan(id=uuid.uuid4(), repository_id=repo.id, initiated_by=current_user.id, branch=body.branch, status="queued", progress=0, created_at=now, updated_at=now)
+    new_scan = DBScan(
+        id=uuid.uuid4(),
+        repository_id=repo.id,
+        initiated_by=current_user.id,
+        branch=body.branch,
+        status="queued",
+        progress=0,
+        started_at=None,
+        completed_at=None,
+        cancelled_at=None,
+        created_at=now,
+        updated_at=now
+    )
     db.add(new_scan)
     await db.commit()
     await db.refresh(new_scan)
-    redis = await get_redis_pool()
-    if redis:
-        try:
-            await redis.enqueue_job("process_scan_job", str(new_scan.id), repo.url, body.branch, str(repo.id))
-        except Exception:
-            background_tasks.add_task(run_in_process_fallback, str(new_scan.id), repo.url, body.branch, str(repo.id))
-    else:
-        background_tasks.add_task(run_in_process_fallback, str(new_scan.id), repo.url, body.branch, str(repo.id))
-    return ScanResponse(status="success", data=Scan(id=new_scan.id, repositoryId=new_scan.repository_id, branch=new_scan.branch, status=ScanStatus.queued, progress=0, findingsCount=FindingsCount(), startedAt=None, completedAt=None, cancelledAt=None, createdAt=ensure_utc(new_scan.created_at), updatedAt=ensure_utc(new_scan.updated_at)))
+
+    # Dispatch scan execution in background thread
+    background_tasks.add_task(
+        run_in_process_fallback,
+        str(new_scan.id),
+        repo.url,
+        body.branch,
+        str(repo.id)
+    )
+
+    return ScanResponse(
+        status="success",
+        data=Scan(
+            id=new_scan.id,
+            repositoryId=new_scan.repository_id,
+            branch=new_scan.branch,
+            status=ScanStatus.queued,
+            progress=0,
+            findingsCount=FindingsCount(),
+            startedAt=None,
+            completedAt=None,
+            cancelledAt=None,
+            createdAt=ensure_utc(new_scan.created_at),
+            updatedAt=ensure_utc(new_scan.updated_at)
+        )
+    )
 
 @router.get("/{id}", response_model=ScanResponse)
 async def get_scan(id: uuid.UUID, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
