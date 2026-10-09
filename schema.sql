@@ -3,18 +3,15 @@
 -- Implements Database Design Specification (DDS) v1.0
 -- ============================================================================
 
--- 1. Enable Required Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. Drop Existing Tables (if executing clean reset)
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS findings CASCADE;
 DROP TABLE IF EXISTS scans CASCADE;
 DROP TABLE IF EXISTS repositories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- 3. Trigger Function for Automatic updated_at Timestamps
 CREATE OR REPLACE FUNCTION update_timestamp_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -23,9 +20,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================================
--- TABLE 1: users
--- ============================================================================
+-- 1. users
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -37,18 +32,14 @@ CREATE TABLE users (
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT chk_users_role CHECK (role IN ('developer', 'security_analyst', 'administrator')),
-    CONSTRAINT chk_users_email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+    CONSTRAINT chk_users_role CHECK (role IN ('developer', 'security_analyst', 'administrator'))
 );
 
 CREATE TRIGGER trg_users_updated_at
 BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 
--- ============================================================================
--- TABLE 2: repositories
--- ============================================================================
+-- 2. repositories
 CREATE TABLE repositories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     url VARCHAR(1024) NOT NULL,
@@ -60,9 +51,7 @@ CREATE TABLE repositories (
     added_by UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
     CONSTRAINT fk_repositories_added_by FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_repositories_provider CHECK (provider IN ('github', 'gitlab', 'bitbucket')),
     CONSTRAINT uq_user_repository_url UNIQUE (added_by, url)
 );
 
@@ -70,9 +59,7 @@ CREATE TRIGGER trg_repositories_updated_at
 BEFORE UPDATE ON repositories
 FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 
--- ============================================================================
--- TABLE 3: scans
--- ============================================================================
+-- 3. scans
 CREATE TABLE scans (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     repository_id UUID NOT NULL,
@@ -85,7 +72,6 @@ CREATE TABLE scans (
     cancelled_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
     CONSTRAINT fk_scans_repository FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
     CONSTRAINT fk_scans_initiated_by FOREIGN KEY (initiated_by) REFERENCES users(id),
     CONSTRAINT chk_scans_status CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
@@ -96,9 +82,7 @@ CREATE TRIGGER trg_scans_updated_at
 BEFORE UPDATE ON scans
 FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 
--- ============================================================================
--- TABLE 4: findings
--- ============================================================================
+-- 4. findings
 CREATE TABLE findings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     scan_id UUID NOT NULL,
@@ -119,7 +103,6 @@ CREATE TABLE findings (
     reviewed_by UUID,
     reviewed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
     CONSTRAINT fk_findings_scan FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE,
     CONSTRAINT fk_findings_repository FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
     CONSTRAINT fk_findings_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id),
@@ -128,9 +111,7 @@ CREATE TABLE findings (
     CONSTRAINT chk_findings_review_status CHECK (review_status IN ('open', 'acknowledged', 'false_positive', 'resolved'))
 );
 
--- ============================================================================
--- TABLE 5: reports
--- ============================================================================
+-- 5. reports
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     scan_id UUID NOT NULL,
@@ -140,33 +121,17 @@ CREATE TABLE reports (
     file_size INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
-
     CONSTRAINT fk_reports_scan FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE,
-    CONSTRAINT chk_reports_status CHECK (status IN ('generating', 'ready', 'failed')),
-    CONSTRAINT chk_reports_format CHECK (format IN ('pdf', 'json', 'csv'))
+    CONSTRAINT chk_reports_status CHECK (status IN ('generating', 'ready', 'failed'))
 );
 
--- ============================================================================
--- PERFORMANCE & MULTI-TENANT INDEXES (Section 6 of DDS)
--- ============================================================================
--- User Lookups
+-- Indexes
 CREATE UNIQUE INDEX idx_users_email_lower ON users (LOWER(email));
-
--- Tenant Isolation Indexes (FR-10)
 CREATE INDEX idx_repositories_added_by ON repositories (added_by);
 CREATE INDEX idx_scans_repository_id ON scans (repository_id);
-CREATE INDEX idx_scans_initiated_by ON scans (initiated_by);
+CREATE INDEX idx_scans_status ON scans (status);
 CREATE INDEX idx_findings_scan_id ON findings (scan_id);
 CREATE INDEX idx_findings_repository_id ON findings (repository_id);
-CREATE INDEX idx_reports_scan_id ON reports (scan_id);
-
--- Finding Filtering & Triage Indexes (GET /api/findings)
 CREATE INDEX idx_findings_severity ON findings (severity);
-CREATE INDEX idx_findings_confidence ON findings (confidence);
 CREATE INDEX idx_findings_review_status ON findings (review_status);
-CREATE INDEX idx_findings_category ON findings (category);
-CREATE INDEX idx_findings_created_at ON findings (created_at DESC);
-
--- Scan Lifecycle Polling Indexes (GET /api/scans/{id}/status)
-CREATE INDEX idx_scans_status ON scans (status);
-CREATE INDEX idx_scans_created_at ON scans (created_at DESC);
+CREATE INDEX idx_reports_scan_id ON reports (scan_id);

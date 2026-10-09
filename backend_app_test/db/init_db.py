@@ -1,6 +1,5 @@
 """
 PostgreSQL Schema Initializer & Verification Script
-Verifies table creation, foreign keys, and indexes against the PostgreSQL database.
 """
 
 import asyncio
@@ -14,30 +13,29 @@ logger = logging.getLogger(__name__)
 
 
 async def initialize_and_verify_database():
-    logger.info("Connecting to PostgreSQL 16...")
-
+    logger.info("Connecting to PostgreSQL 16 database...")
+    
     async with engine.begin() as conn:
-        # Create all tables defined in SQLAlchemy models
+        # Create all tables defined in models
         await conn.run_sync(Base.metadata.create_all)
-
+        
     logger.info("Verifying tables in PostgreSQL schema...")
-
+    
     async with engine.connect() as conn:
         result = await conn.execute(
             text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
         )
         tables = [row[0] for row in result.fetchall()]
-
         expected_tables = ["users", "repositories", "scans", "findings", "reports"]
-
+        
         for t in expected_tables:
             if t in tables:
-                logger.info(f"  [OK] PostgreSQL Table '{t}' verified.")
+                logger.info(f"  [OK] Table '{t}' verified.")
             else:
-                logger.error(f"  [FAIL] Missing PostgreSQL table: '{t}'")
+                logger.error(f"  [FAIL] Missing table: '{t}'")
                 raise RuntimeError(f"Database schema incomplete: missing '{t}'")
 
-    logger.info("PostgreSQL database initialized successfully according to DDS v1.0!")
+    logger.info("Database initialized successfully according to DDS v1.0!")
 
 
 if __name__ == "__main__":
