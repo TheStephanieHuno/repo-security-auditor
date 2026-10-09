@@ -1,24 +1,69 @@
-name: CI
+name: CI Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - devops-setup
+    branches: [main, backend, devops-setup, feat/backend-setup]
   pull_request:
-    branches:
-      - main
+    branches: [main, backend, devops-setup]
 
 jobs:
-  check:
+  lint-and-test:
+    name: Lint, Typecheck, and Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: auditor
+          POSTGRES_PASSWORD: auditor123
+          POSTGRES_DB: repo_auditor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Check repository structure
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install System Dependencies
         run: |
-          echo "Repository checked out successfully."
-          echo "CI workflow sis running."
-          ls -la
+          sudo apt-get update
+          sudo apt-get install -y git curl
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff Linting
+        run: ruff check .
+
+      - name: Run Pytest Test Suite
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: postgresql+asyncpg://auditor:auditor123@localhost:5432/repo_auditor
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          SECRET_KEY: test-secret-key-minimum-256-bits-length-for-ci
+        run: pytest -p no:langsmith tests/ -v
