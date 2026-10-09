@@ -15,6 +15,8 @@ arq>=0.26.0
 redis>=5.0.0
 reportlab>=4.2.0
 semgrep>=1.90.0
+
+# Testing and Quality
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
 ruff>=0.7.0
