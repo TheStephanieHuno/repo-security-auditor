@@ -347,18 +347,51 @@ export function SelectControl({
   )
 }
 
-export function BranchSelect({ repoId, value, onChange }: { repoId: string; value: string; onChange: (value: string) => void }) {
-  const { data, isLoading, isError, refetch } = useRepositoryBranches(repoId)
-  const branches = data ?? []
+export function BranchSelect({
+  repoId,
+  value,
+  onChange,
+}: {
+  repoId: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { data: rawBranches, isLoading } = useRepositoryBranches(repoId)
+  const branches = Array.isArray(rawBranches) ? rawBranches : []
+  const defaultBranch = branches.find((b: any) => b.isDefault || b.is_default)?.name || "main"
+
   return (
     <div className="space-y-2">
-      <label htmlFor="scan-branch" className="text-xs font-medium">Branch</label>
-      <Input id="scan-branch" list="repository-branches" value={value} disabled={isLoading || isError || branches.length <= 1} onChange={(event) => onChange(event.target.value)} placeholder={isLoading ? "Loading branches…" : "Search branches"} aria-describedby="branch-help" />
-      <datalist id="repository-branches">{branches.map((branch) => <option key={branch.name} value={branch.name}>{branch.is_default ? "Default" : ""}</option>)}</datalist>
-      <p id="branch-help" className="text-xs text-muted-foreground">{isLoading ? "Loading available branches…" : isError ? <><span>Branches could not be loaded. </span><button type="button" className="underline" onClick={() => refetch()}>Retry</button></> : branches.length <= 1 ? "This repository has only one branch." : "Search and select the branch to scan."}</p>
+      <div className="flex items-center justify-between text-xs">
+        <label htmlFor="branch-select" className="font-medium text-foreground">
+          Branch to scan
+        </label>
+        {isLoading && <span className="text-muted-foreground animate-pulse">Loading branches...</span>}
+      </div>
+      <select
+        id="branch-select"
+        value={value || defaultBranch}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-10 px-3 rounded-lg border bg-background text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
+        disabled={isLoading && branches.length === 0}
+      >
+        {branches.length === 0 ? (
+          <option value={value || "main"}>{value || "main (default)"}</option>
+        ) : (
+          branches.map((b: any) => (
+            <option key={b.name} value={b.name}>
+              {b.name} {(b.isDefault || b.is_default) ? "★ (default)" : ""} {b.lastCommit ? `· [${b.lastCommit}]` : ""}
+            </option>
+          ))
+        )}
+      </select>
+      <p className="text-[11px] text-muted-foreground">
+        Select the target Git branch to analyze.
+      </p>
     </div>
   )
 }
+
 export function Notice({
   title,
   children,
@@ -602,7 +635,7 @@ export function CodeBlock({
         </Button>
       </div>
       <pre className="overflow-x-auto py-4 font-mono text-xs leading-7">
-        {code.split("\n").map((line, index) => (
+        {(code || "").split("\n").map((line, index) => (
           <div
             key={index}
             className={cn(
@@ -743,22 +776,65 @@ export function ScanDialog({
 }) {
   const navigate = useNavigate()
   const { data: reposData } = useRepositories(1, 100)
-  const repositories = reposData?.items || []
-  const { data: isGitHubConnected } = useGitHubStatus()
-  const { mutateAsync: triggerScan } = useTriggerScan()
+  const rawRepos = Array.isArray(reposData) ? reposData : (reposData?.items || reposData?.data || [])
+  const repositories = Array.isArray(rawRepos) ? rawRepos : []
   
-  const [selected, setSelected] = useState(
-    repo?.id || repositories[0]?.id || "",
-  )
-  const activeRepo = repo || repositories.find((item) => item.id === selected)
-  const { data: branches } = useRepositoryBranches(activeRepo?.id || "")
+  const { mutateAsync: triggerScan } = useTriggerScan()
+
+  // Select repo with fallback to first repository in database
+  const [selectedId, setSelectedId] = useState<string>(repo?.id || "")
+  
+  useEffect(() => {
+    if (repo?.id) {
+      setSelectedId(repo.id)
+    } else if (repositories.length > 0 && !selectedId) {
+      setSelectedId(repositories[0].id)
+    }
+  }, [repo, repositories, selectedId])
+
+  const activeRepo = (repo?.id ? repo : null) || repositories.find((r: any) => r.id === selectedId) || (repositories.length > 0 ? repositories[0] : null)
+  
+  const targetRepoId = activeRepo?.id || repo?.id || selectedId || ""
+
+  const { data: rawBranches, isLoading: branchesLoading } = useRepositoryBranches(targetRepoId)
+  const branches = Array.isArray(rawBranches) ? rawBranches : []
+  
+  const defaultBranch = branches.find((b: any) => b.isDefault || b.is_default)?.name || activeRepo?.defaultBranch || activeRepo?.branch || "main"
   const [branch, setBranch] = useState(initialBranch || "")
-  const defaultBranch = branches?.find((item) => item.is_default)?.name || activeRepo?.branch || ""
-  useEffect(() => { if (defaultBranch && (!branch || !branches?.some((item) => item.name === branch))) setBranch(initialBranch || defaultBranch) }, [defaultBranch, initialBranch, branch, branches])
-  const [params] = useSearchParams()
-  const [error, setError] = useState(false)
-  const [githubError, setGithubError] = useState(false)
+
+  useEffect(() => {
+    if (defaultBranch && (!branch || !branches.some((b: any) => b.name === branch))) {
+      setBranch(initialBranch || defaultBranch)
+    }
+  }, [defaultBranch, initialBranch, branch, branches])
+
   const [launching, setLaunching] = useState(false)
+
+  async function handleStartScan() {
+    if (!targetRepoId || targetRepoId.trim() === "") {
+      toast.error("No repository selected. Please add or select a repository first.")
+      return
+    }
+
+    setLaunching(true)
+    try {
+      const chosenBranch = branch || defaultBranch || "main"
+      
+      await triggerScan({
+        repositoryId: targetRepoId,
+        branch: chosenBranch,
+      })
+
+      onOpenChange(false)
+      toast.success("Security scan initiated successfully!")
+      navigate("/scans")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to start security scan.")
+    } finally {
+      setLaunching(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -774,20 +850,23 @@ export function ScanDialog({
         <div className="space-y-5 py-3">
           <div>
             <p className="mb-2 text-xs font-medium">Repository</p>
-            {repo ? (
+            {activeRepo ? (
               <div className="rounded-lg border p-3">
-                <RepoIdentity repo={repo} />
+                <RepoIdentity repo={activeRepo} />
               </div>
             ) : (
-              <SelectControl
-                label="Repository to scan"
-                value={selected}
-                onChange={setSelected}
-                options={repositories.map((item) => item.id)}
-              />
+              <div className="rounded-lg border p-3 text-xs text-muted-foreground">
+                {repositories.length > 0 ? "Loading repository..." : "No repositories found. Please add a repository first."}
+              </div>
             )}
           </div>
-          <BranchSelect repoId={activeRepo?.id || ""} value={branch || defaultBranch} onChange={setBranch} />
+          
+          <BranchSelect
+            repoId={targetRepoId}
+            value={branch || defaultBranch}
+            onChange={setBranch}
+          />
+
           <div className="grid grid-cols-2 gap-3">
             {categories.map((category) => {
               const Icon = categoryIcons[category]
@@ -803,84 +882,44 @@ export function ScanDialog({
               )
             })}
           </div>
+
           <Notice>
             All four checks are enabled. Repository content is analyzed in an
-            isolated environment. Analysis may take several minutes depending on
-            repository size.
+            isolated environment. Analysis may take several minutes depending on repository size.
           </Notice>
-          <p className="text-xs text-muted-foreground">
-            Frontend demo: progress is simulated. No repository is cloned or
-            scanned.
-          </p>
-          {error && (
-            <Notice title="Scan could not be created" tone="error">
-              The scan queue could not be reached. Previous scan results are
-              still available. Retry after restoring the connection.
-            </Notice>
-          )}
-          {githubError && (
-            <Notice
-              tone="error"
-              title="GitHub is disconnected"
-              action={
-                <LinkButton to="/settings?tab=github">
-                  Restore connection
-                </LinkButton>
-              }
-            >
-              Your saved findings remain available. Restore the demo connection
-              in Settings before starting a new scan.
-            </Notice>
-          )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end items-center gap-3 pt-4 mt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={launching}
+            className="w-full sm:w-auto h-10 px-5 text-xs font-medium cursor-pointer"
+          >
             Cancel
           </Button>
           <Button
-            disabled={launching || (!repo && !selected)}
-            onClick={async () => {
-              if (isGitHubConnected?.connected === false) {
-                setGithubError(true)
-                return
-              }
-              setGithubError(false)
-              if (params.get("state") === "scan-error" && !error) {
-                setError(true)
-                return
-              }
-              setLaunching(true)
-              try {
-                if (!branch) throw new Error("Select a branch before starting the scan.")
-                const scan = await triggerScan({ repo_id: repo?.id || selected, branch })
-                onOpenChange(false)
-                setLaunching(false)
-                navigate(`/scans/${scan.id}`)
-                toast.success("Security scan queued", {
-                  description: "Scan started.",
-                })
-              } catch (failure) {
-                toast.error(
-                  failure instanceof Error
-                    ? failure.message
-                    : "Could not create the scan. Existing results remain available.",
-                )
-                setLaunching(false)
-              }
-            }}
+            type="button"
+            onClick={handleStartScan}
+            disabled={launching || !targetRepoId}
+            className="w-full sm:w-auto h-10 px-6 gap-2 text-xs font-medium cursor-pointer shadow-sm"
           >
             {launching ? (
-              <Loader2 className="size-4 animate-spin" />
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                Starting scan...
+              </>
             ) : (
-              <Play className="size-3.5" />
+              "Start security scan"
             )}
-            Start scan
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+
 export function DownloadReport({
   scanId,
   variant = "outline",

@@ -311,7 +311,7 @@ export const findings: Finding[] = [
     category: "Dependencies",
     file: "package.json",
     line: 24,
-    scanner: "Trivy",
+    scanner: "Google OSV",
     rule: "CVE-2021-23337",
     description:
       "lodash 4.17.20 is affected by a known command-injection vulnerability.",
@@ -350,7 +350,7 @@ export const findings: Finding[] = [
     category: "Dependencies",
     file: "requirements.txt",
     line: 8,
-    scanner: "Trivy",
+    scanner: "Google OSV",
     rule: "CVE-2023-32681",
     description:
       "An installed requests version may forward proxy credentials on redirects.",
@@ -371,7 +371,7 @@ export const findings: Finding[] = [
     confidence: "Medium",
     file: "docker-compose.yml",
     line: 31,
-    scanner: "Checkov",
+    scanner: "Config Scanner",
     rule: "CUSTOM_DOCKER_DEBUG_01",
     description:
       "Debug mode is enabled in a container environment configuration.",
@@ -393,7 +393,7 @@ export const findings: Finding[] = [
     confidence: "Medium",
     file: "infra/storage.tf",
     line: 12,
-    scanner: "Checkov",
+    scanner: "Config Scanner",
     rule: "CKV_AWS_19",
     description:
       "An explicit encryption configuration is missing from the Terraform resource.",
@@ -433,7 +433,7 @@ export const findings: Finding[] = [
     category: "Dependencies",
     file: "package-lock.json",
     line: 381,
-    scanner: "Trivy",
+    scanner: "Google OSV",
     rule: "CVE-2021-44906",
     description:
       "A transitive minimist dependency is affected by prototype pollution.",
@@ -454,7 +454,7 @@ export const findings: Finding[] = [
     confidence: "Medium",
     file: "config/session.ts",
     line: 14,
-    scanner: "Checkov",
+    scanner: "Config Scanner",
     rule: "CUSTOM_COOKIE_SECURE_01",
     description:
       "The session cookie configuration does not require HTTPS transport.",
@@ -473,7 +473,7 @@ export const findings: Finding[] = [
     category: "Dependencies",
     file: "requirements.txt",
     line: 12,
-    scanner: "Trivy",
+    scanner: "Google OSV",
     rule: "CVE-2023-43804",
     description:
       "An older urllib3 version may retain sensitive headers on redirects.",
@@ -504,7 +504,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Outdated PyYAML dependency",
       "requirements.txt",
       17,
-      "Trivy",
+      "Google OSV",
     ],
     [
       "api-service",
@@ -522,7 +522,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Outdated certifi package",
       "requirements.txt",
       24,
-      "Trivy",
+      "Google OSV",
     ],
     [
       "mobile-app",
@@ -531,7 +531,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Vulnerable axios dependency",
       "package.json",
       31,
-      "Trivy",
+      "Google OSV",
     ],
     [
       "mobile-app",
@@ -540,7 +540,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Cleartext traffic allowed",
       "android/AndroidManifest.xml",
       12,
-      "Checkov",
+      "Config Scanner",
     ],
     [
       "mobile-app",
@@ -558,7 +558,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Backup enabled for application",
       "android/AndroidManifest.xml",
       9,
-      "Checkov",
+      "Config Scanner",
     ],
     [
       "internal-dashboard",
@@ -576,7 +576,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Outdated express dependency",
       "package.json",
       28,
-      "Trivy",
+      "Google OSV",
     ],
     [
       "internal-dashboard",
@@ -585,7 +585,7 @@ const additional: Array<[string, Severity, Category, string, string, number, str
       "Missing content security policy",
       "config/headers.ts",
       8,
-      "Checkov",
+      "Config Scanner",
     ],
     [
       "internal-dashboard",
@@ -708,14 +708,14 @@ export const scannerInfo = [
     version: "8.28.0",
   },
   {
-    name: "Trivy",
+    name: "Google OSV",
     category: "Dependencies",
     description: "Dependency analysis",
     duration: "1m 48s",
     version: "0.66.0",
   },
   {
-    name: "Checkov",
+    name: "Config Scanner",
     category: "Configuration",
     description: "Configuration / IaC",
     duration: "46s",
@@ -739,8 +739,8 @@ export const scanActivity = [
   "Preparing isolated repository workspace…",
   "Gitleaks: searching for credential patterns…",
   "Semgrep: analyzing supported source files…",
-  "Trivy: matching dependency versions against advisories…",
-  "Checkov: checking configuration and IaC…",
+  "Google OSV: matching dependency versions against advisories…",
+  "Config Scanner: checking configuration and IaC…",
   "Consolidating scanner evidence into normalized findings…",
   "Correlating locations and collecting repository context…",
   "Generating explanations from collected evidence…",

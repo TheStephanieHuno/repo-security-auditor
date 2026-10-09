@@ -545,7 +545,7 @@ export function ReportDetail() {
                     <p className="text-xs font-medium">{scanner.description}</p>
                     <StatusBadge
                       status={
-                        scan.status === "Partial" && scanner.name === "Checkov"
+                        scan.status === "Partial" && scanner.name === "Config Scanner"
                           ? "Failed"
                           : "Completed"
                       }

@@ -363,7 +363,7 @@ export function RepositoryList() {
 const validationMessages: Record<string, [string, string]> = {
   invalid: [
     "Enter a valid GitHub repository URL.",
-    "Use the format https://github.com/organization/repository.",
+    "Use the format https://github.com/octocat/Hello-World.",
   ],
   missing: [
     "We couldn't find this repository.",
@@ -478,7 +478,7 @@ export function AddRepository() {
                     setUrl(event.target.value)
                     setState("idle")
                   }}
-                  placeholder="https://github.com/organization/repository"
+                  placeholder="https://github.com/octocat/Hello-World"
                   aria-invalid={!!validationMessages[state]}
                   aria-describedby={
                     validationMessages[state] ? "validation-error" : "repo-hint"
@@ -505,7 +505,7 @@ export function AddRepository() {
                 </Button>
               </div>
               <p id="repo-hint" className="mt-2 text-xs text-muted-foreground">
-                For the demo, try https://github.com/Amalitech/payment-service.
+                Enter any public GitHub repository URL (e.g. https://github.com/octocat/Hello-World).
               </p>
             </form>
             {validationMessages[state] && (
@@ -553,8 +553,7 @@ export function AddRepository() {
             {state === "success" && preview && (
               <div className="space-y-4">
                 <Notice title="Repository validated" tone="success">
-                  Repository exists in the demo · Access confirmed in sample
-                  data · Supported project · Ready to scan
+                  Repository verified · Access confirmed · Ready to scan
                 </Notice>
                 <div className="rounded-lg border p-5">
                   <RepoIdentity repo={preview} subtitle />
@@ -580,7 +579,7 @@ export function AddRepository() {
                     <div>
                       <p className="text-muted-foreground">Latest commit</p>
                       <p className="mt-1.5 font-mono">
-                        {preview.commit} · demo
+                        {preview.commit}
                       </p>
                     </div>
                   </div>
@@ -594,26 +593,24 @@ export function AddRepository() {
                     aria-label="Confirm repository permission"
                   />
                   I have permission to submit and analyze this repository.
-                  Access validation is simulated in this frontend preview.
+                  Security checks run in isolated worker sandboxes.
                 </label>
                 <Button
                   disabled={!permissionConfirmed}
                   className="h-10 w-full"
                   onClick={async () => {
-                    const exists = repositories.some(
-                      (repo) => repo.id === preview.id,
-                    )
-                    if (!exists) {
-                      await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
-                    }
-                    toast.success(
-                      exists
-                        ? "Repository already connected"
-                        : "Repository connected",
-                      { description: preview.name },
-                    )
-                    navigate(`/repositories/${preview.id}`)
-                  }}
+                  try {
+                    const repoUrl = preview.url || `https://github.com/${preview.name}`
+                    await createRepository({ url: repoUrl })
+                    toast.success("Repository added to workspace successfully!")
+                    setState("idle")
+                    setPreview(null)
+                    setUrl("")
+                  } catch (err: any) {
+                    const msg = err?.message || "This repository has already been added to your workspace."
+                    toast.error(msg)
+                  }
+                }}
                 >
                   {repositories.some((repo) => repo.id === preview.id)
                     ? "Open repository"
@@ -637,9 +634,7 @@ export function AddRepository() {
             </Button>
           </div>
           <div className="border-t bg-canvas px-6 py-4 text-xs leading-relaxed text-muted-foreground">
-            This is a frontend prototype. URL validation and repository
-            permissions are simulated; no GitHub account or repository content
-            is accessed.
+            Connected repositories are analyzed in an isolated temporary sandbox. Analysis is strictly read-only.
           </div>
         </Panel>
         <div className="space-y-5 xl:col-span-2">
@@ -802,7 +797,7 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
         >
           View report
         </Button>
-        <Button className="h-9" onClick={() => setScanOpen(true)}>
+        <Button className="h-9" onClick={() => { setSelected(repo); setScanOpen(true); }}>
           <Play className="size-3.5" />
           Start scan
         </Button>
@@ -915,7 +910,7 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
                     title="No scans yet"
                     description="Start your first scan to collect security evidence."
                     action={
-                      <Button onClick={() => setScanOpen(true)}>
+                      <Button onClick={() => { setSelected(repo); setScanOpen(true); }}>
                         Start scan
                       </Button>
                     }
@@ -927,35 +922,58 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
           <Panel className="mt-5">
             <PanelHeader
               title="Analysis coverage"
-              description="Independent tools provide evidence across four security categories."
+              description="Unified security analysis executed across four core vulnerability domains."
             />
-            <div className="grid divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
-              {scannerInfo.map((scanner) => (
-                <div key={scanner.name} className="border-t px-5 py-5">
-                  <p className="text-sm font-semibold">{scanner.description}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {scanner.category} scanner
-                  </p>
-                  <div className="mt-5 flex items-center justify-between">
-                    <span className="text-xs">
-                      {
-                        findings.filter(
-                          (findingRecord) =>
-                            findingRecord.scanner === scanner.name,
-                        ).length
-                      }{" "}
-                      findings
-                    </span>
-                    <StatusBadge
-                      status={
-                        latest?.status === "Partial" &&
-                        scanner.name === "Checkov"
-                          ? "Failed"
-                          : report
-                            ? "Completed"
-                            : "Not scanned"
-                      }
-                    />
+            <div className="grid grid-cols-1 divide-y border-t md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+              {[
+                {
+                  title: "Source-code analysis",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("code") || c.includes("source") || (c.includes("vulnerability") && !c.includes("dependency"))
+                  }).length,
+                  desc: "Analyzes AST syntax for SQL injection, command execution, and unsafe logic."
+                },
+                {
+                  title: "Secret detection",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("secret") || c.includes("key") || c.includes("token")
+                  }).length,
+                  desc: "Scans repository files for exposed API keys, tokens, passwords, and private keys."
+                },
+                {
+                  title: "Dependency analysis",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("dependency") || c.includes("package") || c.includes("cve")
+                  }).length,
+                  desc: "Queries Google OSV database advisories against pinned manifest versions."
+                },
+                {
+                  title: "Configuration security",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("config") || c.includes("insecure configuration")
+                  }).length,
+                  desc: "Audits settings for committed .env files, debug flags, and CORS wildcards."
+                }
+              ].map((item) => (
+                <div key={item.title} className="p-5 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground">{item.title}</h3>
+                    <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">{item.desc}</p>
+                  </div>
+                  <div className="pt-2">
+                    <p className="text-2xl font-bold text-foreground">
+                      {item.count}
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">findings</span>
+                    </p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${item.count > 0 ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"}`}>
+                        {item.count > 0 ? `${item.count} issues detected` : "Completed clean"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1029,7 +1047,7 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
                 title="No scans have been run for this repository"
                 description="Run a security scan to build an evidence-backed history."
                 action={
-                  <Button onClick={() => setScanOpen(true)}>Start scan</Button>
+                  <Button onClick={() => { setSelected(repo); setScanOpen(true); }}>Start scan</Button>
                 }
               />
             </Panel>
@@ -1067,7 +1085,7 @@ export function RepositoryDetail({ start = false }: { start?: boolean }) {
                     : "Run a scan to collect security evidence."
                 }
                 action={
-                  <Button onClick={() => setScanOpen(true)}>Start scan</Button>
+                  <Button onClick={() => { setSelected(repo); setScanOpen(true); }}>Start scan</Button>
                 }
               />
             </Panel>

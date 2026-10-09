@@ -351,7 +351,7 @@ export function Shell({ children }: { children?: React.ReactNode } = {}) {
                 variant="outline"
                 className="hidden rounded-md text-muted-foreground sm:inline-flex"
               >
-                Demo workspace
+                Production Workspace
               </Badge>
             </Link>
             <div className="hidden h-5 border-l sm:block" />

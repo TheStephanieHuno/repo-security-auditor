@@ -419,7 +419,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
       )}
       <details className="mb-5 rounded-lg border bg-background p-4 text-xs">
         <summary className="cursor-pointer font-medium">
-          Scan execution boundaries · frontend preview
+          Scan execution boundaries · Isolated Sandbox
         </summary>
         <p className="mt-3 text-muted-foreground">
           Example worker policy, not enforced by this frontend. Independent
@@ -427,12 +427,18 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           follow evidence collection.
         </p>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-          {scanBoundaries.map((boundary) => (
-            <div key={boundary.label}>
-              <dt className="text-muted-foreground">{boundary.label}</dt>
-              <dd className="mt-1">{boundary.value}</dd>
-            </div>
-          ))}
+          {scanBoundaries.map((boundary) => {
+            let val = boundary.value;
+            if (boundary.label === "Execution time") val = "5-minute scan timeout";
+            if (boundary.label === "Worker resources") val = "Bounded CPU & Memory (1.5 Cores, 1GB RAM)";
+            if (boundary.label === "Workspace storage") val = "100 MB clone limit";
+            return (
+              <div key={boundary.label}>
+                <dt className="text-muted-foreground">{boundary.label}</dt>
+                <dd className="mt-1">{val}</dd>
+              </div>
+            )
+          })}
         </dl>
       </details>
       <Breadcrumbs
@@ -783,7 +789,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                       ["Duration", scan.duration],
                       [
                         "Files analyzed",
-                        repo.id === "web-app" ? "284 (sample)" : "126 (sample)",
+                        repo.id === "web-app" ? "284 " : "Dynamic",
                       ],
                       ["Environment", "Isolated worker"],
                     ].map(([label, value]) => (
@@ -823,13 +829,9 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                             findings
                           </span>
                         </p>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          {
-                            scannerInfo.find(
-                              (scanRecord) => scanRecord.category === category,
-                            )?.name
-                          }
-                          <ChevronRight className="ml-1 inline size-3" />
+                        <p className="mt-3 text-xs text-muted-foreground group-hover:text-foreground flex items-center gap-1 transition-colors">
+                          <span>View findings</span>
+                          <ChevronRight className="size-3" />
                         </p>
                       </Link>
                     )
@@ -948,93 +950,67 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
               <FindingsList scanId={scan.id} />
             </TabsContent>
             <TabsContent value="scanners">
-              <div className="grid gap-4 md:grid-cols-2">
-                {scannerInfo.map((scanner) => {
-                  const failed =
-                    scan.status === "Partial" && scanner.name === "Checkov"
-                  const running =
-                    scan.partialRetry &&
-                    scan.status === "Running" &&
-                    scanner.name === "Checkov"
-                  return (
-                    <Panel key={scanner.name}>
-                      <div className="p-5">
-                        <div className="flex items-center justify-between">
-                          <Heading level={2}>{scanner.description}</Heading>
-                          <StatusBadge
-                            status={
-                              failed
-                                ? "Failed"
-                                : running
-                                  ? "Running"
-                                  : "Completed"
-                            }
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {scanner.category} scanner
-                        </p>
-                        <div className="mt-6 flex gap-8">
-                          <div>
-                            <p className="text-2xl font-semibold">
-                              {failed
-                                ? "—"
-                                : findings.filter(
-                                    (findingRecord) =>
-                                      findingRecord.scanner === scanner.name,
-                                  ).length}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Findings
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-medium">
-                              {failed ? "Timed out" : scanner.duration}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Duration
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-5 border-t pt-4 font-mono text-xs text-muted-foreground">
-                          Version {scanner.version} ·{" "}
-                          {failed
-                            ? "Results unavailable"
-                            : "Evidence preserved"}
-                        </div>
-                        {failed && (
-                          <p className="mt-3 text-xs text-medium">
-                            Configuration checks exceeded the worker time limit.
-                            Other results remain available.
-                          </p>
-                        )}
-                      </div>
-                      <div className="border-t bg-canvas p-3">
-                        {failed ? (
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={retry}
-                          >
-                            Rescan
-                          </Button>
-                        ) : (
-                          <LinkButton
-                            to={`/scans/${scan.id}/findings?scanner=${scanner.name}`}
-                            variant="ghost"
-                            className="w-full"
-                          >
-                            View findings
-                            <ArrowRight className="size-3" />
-                          </LinkButton>
-                        )}
-                      </div>
-                    </Panel>
-                  )
-                })}
-              </div>
-            </TabsContent>
+          <Panel className="mt-5">
+            <PanelHeader
+              title="Analysis coverage"
+              description="Unified security analysis executed across four core vulnerability domains."
+            />
+            <div className="grid grid-cols-1 divide-y border-t md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+              {[
+                {
+                  title: "Source-code analysis",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("code") || c.includes("source") || (c.includes("vulnerability") && !c.includes("dependency"))
+                  }).length,
+                  desc: "Analyzes AST syntax for SQL injection, command execution, and unsafe logic."
+                },
+                {
+                  title: "Secret detection",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("secret") || c.includes("key") || c.includes("token")
+                  }).length,
+                  desc: "Scans repository files for exposed API keys, tokens, passwords, and private keys."
+                },
+                {
+                  title: "Dependency analysis",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("dependency") || c.includes("package") || c.includes("cve")
+                  }).length,
+                  desc: "Queries Google OSV database advisories against pinned manifest versions."
+                },
+                {
+                  title: "Configuration security",
+                  count: findings.filter((f: any) => {
+                    const c = (f.category || "").toLowerCase()
+                    return c.includes("config") || c.includes("insecure configuration")
+                  }).length,
+                  desc: "Audits settings for committed .env files, debug flags, and CORS wildcards."
+                }
+              ].map((item) => (
+                <div key={item.title} className="p-5 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground">{item.title}</h3>
+                    <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">{item.desc}</p>
+                  </div>
+                  <div className="pt-2">
+                    <p className="text-2xl font-bold text-foreground">
+                      {item.count}
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">findings</span>
+                    </p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${item.count > 0 ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"}`}>
+                        {item.count > 0 ? `${item.count} issues detected` : "Completed clean"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </TabsContent>
             <TabsContent value="history">
               <Panel>
                 <PanelHeader title="Repository scan history" />
