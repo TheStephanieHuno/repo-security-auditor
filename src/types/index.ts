@@ -82,6 +82,7 @@ export interface RepositoryValidate {
 export interface ValidateResponse {
   accessible: boolean
   name?: string
+  owner?: string
   description?: string
   language?: string
   branch?: string

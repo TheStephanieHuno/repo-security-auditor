@@ -417,7 +417,7 @@ export function AddRepository() {
         setState("offline")
         return
       }
-      const name = result.name || trimmed.replace(/\.git\/?$/, "").replace(/^https:\/\/github\.com\//, "")
+      const name = result.owner && result.name ? `${result.owner}/${result.name}` : (result.name || trimmed.replace(/\.git\/?$/, "").replace(/^https:\/\/github\.com\//, ""))
       const existing = repositories.find(
         (repo) => repo.name.toLowerCase() === name.toLowerCase(),
       )
@@ -617,20 +617,25 @@ export function AddRepository() {
                   disabled={!permissionConfirmed}
                   className="h-10 w-full"
                   onClick={async () => {
-                    const exists = repositories.some(
-                      (repo) => repo.id === preview.id,
-                    )
-                    let created = preview
-                    if (!exists) {
-                      created = await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
+                    try {
+                      const exists = repositories.some(
+                        (repo) => repo.id === preview.id,
+                      )
+                      let created = preview
+                      if (!exists) {
+                        created = await createRepository({ url: preview.url || `https://github.com/${preview.name}` })
+                      }
+                      toast.success(
+                        exists
+                          ? "Repository already connected"
+                          : "Repository connected",
+                        { description: preview.name },
+                      )
+                      navigate(`/repositories/${created.id ?? preview.id}`)
+                    } catch (error) {
+                      setState("idle")
+                      toast.error(error instanceof Error ? error.message : "Could not add this repository.")
                     }
-                    toast.success(
-                      exists
-                        ? "Repository already connected"
-                        : "Repository connected",
-                      { description: preview.name },
-                    )
-                    navigate(`/repositories/${created.id ?? preview.id}`)
                   }}
                 >
                   {repositories.some((repo) => repo.id === preview.id)

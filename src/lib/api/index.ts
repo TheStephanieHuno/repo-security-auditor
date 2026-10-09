@@ -90,6 +90,7 @@ interface ApiFinding {
 interface ApiValidateResult {
   valid?: boolean
   name?: string
+  owner?: string
   message?: string
   defaultBranch?: string
 }
@@ -337,6 +338,7 @@ export const api = {
       return apiClient.post<ApiValidateResult>(endpoints.repositories.validate, body).then(res => ({
         accessible: res.valid ?? false,
         name: res.name,
+        owner: res.owner,
         description: "",
         language: "",
         branch: res.defaultBranch,

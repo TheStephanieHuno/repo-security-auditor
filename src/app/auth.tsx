@@ -24,7 +24,6 @@ import { validatePasswordStrength } from "@/lib/password"
 import { isApiError } from "@/lib/api/errors"
 
 export function Login() {
-  const devToolsEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "true"
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [email, setEmail] = useState("")
@@ -89,16 +88,16 @@ export function Login() {
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             A clearer picture of your code’s security awaits.
           </p>
-          {devToolsEnabled && <Button
+          <Button
             variant="outline"
             disabled={isPending}
             className="mt-8 h-11 w-full"
             onClick={() => signIn(true)}
           >
             <Github className="size-4" />
-            Continue with GitHub{" "}
+            Sign in with GitHub{" "}
             <span className="text-xs text-muted-foreground">(demo)</span>
-          </Button>}
+          </Button>
           <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex-1 border-t" />
             or sign in with email
@@ -202,15 +201,6 @@ export function Login() {
               Create an account
             </button>
           </p>
-          {devToolsEnabled && <Button
-            variant="outline"
-            className="mt-7 h-11 w-full"
-            disabled={isPending}
-            onClick={() => signIn(true)}
-          >
-            Open demo workspace
-            <ArrowRight className="size-4" />
-          </Button>}
         </div>
       </div>
       <Dialog open={forgot} onOpenChange={setForgot}>
@@ -287,7 +277,6 @@ type SignUpValues = z.infer<typeof signUpSchema>
 type SignUpFieldKey = "name" | "email" | "password"
 
 export function SignUp() {
-  const devToolsEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_TOOLS === "true"
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { mutateAsync: register, isPending } = useRegister()
@@ -319,7 +308,7 @@ export function SignUp() {
       }
     }
   }
-  return <div className="flex min-h-screen items-center justify-center bg-background"><div className="w-full max-w-sm px-6 py-12"><div className="mb-10 text-center"><img src="/assets/48bdb.svg" alt="Repo Security Auditor" className="mx-auto mb-8 w-20" /><p className="mb-3 text-xs font-medium tracking-widest text-muted-foreground">GET STARTED</p><Heading>Create your workspace account</Heading><p className="mt-3 text-sm text-muted-foreground">Start reviewing your repositories with evidence-backed security scans.</p></div>{devToolsEnabled && <><Button variant="outline" className="h-11 w-full" onClick={async () => { try { await login({ email: "team.b@amalitechtraining.org", password: "demo-security" }); navigate(safeRedirect) } catch (error) { toast.error(error instanceof Error ? error.message : "Could not connect to the demo workspace.") } }}><Github className="size-4" />Sign up with GitHub<span className="text-xs text-muted-foreground">(demo)</span></Button><div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="flex-1 border-t" />or sign up with email<span className="flex-1 border-t" /></div></>}<form onSubmit={handleSubmit(submit)} className="space-y-4">
+  return <div className="flex min-h-screen items-center justify-center bg-background"><div className="w-full max-w-sm px-6 py-12"><div className="mb-10 text-center"><img src="/assets/48bdb.svg" alt="Repo Security Auditor" className="mx-auto mb-8 w-20" /><p className="mb-3 text-xs font-medium tracking-widest text-muted-foreground">GET STARTED</p><Heading>Create your workspace account</Heading><p className="mt-3 text-sm text-muted-foreground">Start reviewing your repositories with evidence-backed security scans.</p></div><><Button variant="outline" className="h-11 w-full" onClick={async () => { try { await login({ email: "team.b@amalitechtraining.org", password: "demo-security" }); navigate(safeRedirect) } catch (error) { toast.error(error instanceof Error ? error.message : "Could not connect to the demo workspace.") } }}><Github className="size-4" />Sign up with GitHub<span className="text-xs text-muted-foreground">(demo)</span></Button><div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="flex-1 border-t" />or sign up with email<span className="flex-1 border-t" /></div></><form onSubmit={handleSubmit(submit)} className="space-y-4">
     {([['name', 'Full name', 'text'], ['email', 'Email address', 'email'], ['password', 'Password', 'password'], ['confirmPassword', 'Confirm password', 'password']] as const).map(([name, label, type]) => <div key={name}><label className="mb-2 block text-xs font-medium">{label}</label>{type === "password" ? <PasswordInput {...field(name)} className="h-11" /> : <Input type={type} {...field(name)} className="h-11" />}{errors[name] && <p className="mt-1 text-xs text-critical">{errors[name]?.message}</p>}</div>)}
     <Button type="submit" disabled={isPending} className="h-11 w-full">{isPending ? <Loader2 className="size-4 animate-spin" /> : "Create account"}</Button>
   </form><p className="mt-6 text-center text-xs text-muted-foreground">Already have an account? <button type="button" className="underline" onClick={() => navigate(`/login${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`)}>Sign in</button></p></div></div>
