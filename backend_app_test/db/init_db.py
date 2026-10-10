@@ -6,7 +6,7 @@ import asyncio
 import logging
 from sqlalchemy import text
 from backend_app_test.db.session import engine, Base
-from backend_app_test.db import models
+from backend_app_test.db import models  # noqa: F401  (registers tables before create_all)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
