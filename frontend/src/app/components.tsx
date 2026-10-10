@@ -209,9 +209,15 @@ export function SeverityBadge({ severity }: { severity: Severity }) {
     </Badge>
   )
 }
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, findings }: { status: string; findings?: number }) {
   const scanStatuses = ["Completed", "Partial", "Failed", "Running", "Queued", "Cancelled"]
-  const displayStatus = scanStatuses.includes(status) ? scanOutcomeLabels[getScanOutcome({ status })] : status
+  // Only say "clean" or "with findings" when the finding count is known;
+  // a completed scan must never be labelled clean by default.
+  const displayStatus = !scanStatuses.includes(status)
+    ? status
+    : findings === undefined && status === "Completed"
+      ? "Completed"
+      : scanOutcomeLabels[getScanOutcome({ status, findings })]
   const success = ["Completed", "Reviewed", "Resolved", "Connected"].includes(
     status,
   )

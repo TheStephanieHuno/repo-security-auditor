@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "./index"
 import type {
@@ -191,8 +192,12 @@ export function useTriggerScan() {
   })
 }
 
+const TERMINAL_SCAN_STATUSES = ["completed", "failed", "partial", "cancelled"]
+
 export function useScanStatus(id: string) {
-  return useQuery({
+  const qc = useQueryClient()
+  const refreshedFor = useRef<string | null>(null)
+  const query = useQuery({
     queryKey: queryKeys.scanStatus(id),
     queryFn: () => api.getScanStatus(id),
     // Only poll when we have an id and the status is not yet terminal.
@@ -204,10 +209,26 @@ export function useScanStatus(id: string) {
       if (!data) return 2000 // first fetch not yet back — poll every 2 s
       const status = data.status.toLowerCase()
       // Stop polling once the scan reaches a terminal state
-      if (["completed", "failed", "partial", "cancelled"].includes(status)) return false
+      if (TERMINAL_SCAN_STATUSES.includes(status)) return false
       return 2000
     },
   })
+
+  // A finished scan changes findings, counts, and reports. Those queries may
+  // have been cached while the scan was running (staleTime 60 s), so refresh
+  // them once when this scan is first seen in a terminal state.
+  const status = query.data?.status?.toLowerCase()
+  useEffect(() => {
+    if (!id || !status || !TERMINAL_SCAN_STATUSES.includes(status) || refreshedFor.current === id) return
+    refreshedFor.current = id
+    for (const prefix of ["findings", "scanFindings", "scans", "reports", "report", "repository"]) {
+      qc.invalidateQueries({ queryKey: [prefix] })
+    }
+    qc.invalidateQueries({ queryKey: queryKeys.scan(id) })
+    qc.invalidateQueries({ queryKey: queryKeys.dashboard })
+  }, [id, status, qc])
+
+  return query
 }
 
 export function useCancelScan() {

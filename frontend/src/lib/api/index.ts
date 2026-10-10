@@ -83,6 +83,7 @@ interface ApiScan {
   completedAt?: string
   progress?: number
   branch?: string
+  findingsCount?: { critical?: number; high?: number; medium?: number; low?: number; info?: number }
 }
 
 interface ApiFinding {
@@ -208,7 +209,10 @@ function mapScan(s: ApiScan): Scan {
     stage: s.progress ? Math.floor(s.progress / 10) : 0,
     branch: s.branch,
     startedAt: s.startedAt,
-    completedAt: s.completedAt
+    completedAt: s.completedAt,
+    findings: s.findingsCount
+      ? Object.values(s.findingsCount).reduce<number>((sum, n) => sum + (n ?? 0), 0)
+      : undefined,
   }
 }
 

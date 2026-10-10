@@ -32,6 +32,8 @@ export type Scan = {
   retryOf?: string
   outcome?: DemoOutcome
   findingsSnapshot?: Finding[]
+  /** Total findings reported by the API for this scan. */
+  findings?: number
   startedAt?: string
   completedAt?: string
   branch?: string

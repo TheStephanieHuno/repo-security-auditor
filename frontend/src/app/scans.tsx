@@ -187,7 +187,7 @@ export function ScanHistory() {
                     {scan.date}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={scan.status} />
+                    <StatusBadge status={scan.status} findings={scan.findings} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 text-xs">
@@ -308,7 +308,7 @@ export function ScanHistory() {
                 <span className="font-mono text-xs text-muted-foreground">
                   Scan #{scan.id}
                 </span>
-                <StatusBadge status={scan.status} />
+                <StatusBadge status={scan.status} findings={scan.findings} />
               </div>
               <p className="text-xs text-muted-foreground">{scan.date}</p>
               <LinkButton to={`/scans/${scan.id}`} className="w-full">
@@ -512,7 +512,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
           <Panel>
             <div className="border-b px-6 py-5">
               <div className="flex items-center justify-between">
-                <StatusBadge status={displayScan.status} />
+                <StatusBadge status={displayScan.status} findings={displayScan.findings} />
                 <span className="font-mono text-sm font-medium">
                   {displayScan.status === "Queued"
                     ? "Awaiting worker"
@@ -790,7 +790,7 @@ export function ScanPage({ findingsTab = false }: { findingsTab?: boolean }) {
                     {[
                       [
                         "Status",
-                        <StatusBadge key="status" status={displayScan.status} />,
+                        <StatusBadge key="status" status={displayScan.status} findings={displayScan.findings} />,
                       ],
                         ["Branch", displayScan.branch || repo.branch],
                       ["Commit", displayScan.commit || repo.commit],
