@@ -54,7 +54,15 @@ async function request<T>(
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new ApiError(408, "Request Timeout", "The request timed out.")
     }
-    throw new ApiError(0, "Network Error", "A network error occurred.")
+    // fetch only rejects when the request never produced a response: the API is
+    // unreachable, the connection was refused, or the browser blocked it (CORS).
+    // Name the target so the failure is actionable instead of a bare "network error".
+    const target = baseUrl || "this app's own origin (NEXT_PUBLIC_API_BASE_URL is not set)"
+    throw new ApiError(
+      0,
+      "Network Error",
+      `Could not reach the API at ${target}. Check that the backend is running and that the URL is configured correctly.`,
+    )
   }
 
   clearTimeout(timerId)
