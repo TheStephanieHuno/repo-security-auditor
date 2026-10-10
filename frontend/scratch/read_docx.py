@@ -1,7 +1,6 @@
 import zipfile
 import xml.etree.ElementTree as ET
 import sys
-import io
 
 def extract_text_from_docx(docx_path, out_path):
     try:

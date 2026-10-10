@@ -21,7 +21,6 @@ from app.db.models import (
     EvidenceType,
     Finding,
     FindingCategory,
-    FindingExplanation,
     Repository,
     ScannerName,
     Severity,

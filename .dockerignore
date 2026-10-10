@@ -12,3 +12,11 @@ node_modules
 .next
 *.md
 docs
+# Local environments, frontend, and private notes are not part of the backend images
+.venv
+.venv-*
+venv
+frontend
+Review
+*.db
+*.sqlite3

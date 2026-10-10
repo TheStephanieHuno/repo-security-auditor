@@ -183,3 +183,29 @@ def test_audit_log_file_output(tmp_path) -> None:
     )
     [record] = [json.loads(line) for line in log_file.read_text(encoding="utf-8").splitlines()]
     assert (record["event"], record["actor_id"]) == ("user.password_changed", "u-1")
+
+
+@pytest.mark.integration
+def test_audit_logging_survives_startup_migrations(tmp_path) -> None:
+    """Alembic's fileConfig must not disable app.audit (AUTO_MIGRATE=1 is the default)."""
+    log_file = tmp_path / "audit.log"
+    code = (
+        "from app.main import run_migrations;"
+        "from app.core.audit import audit_event, AuditEvent, AuditOutcome;"
+        "run_migrations();"
+        "audit_event(AuditEvent.PASSWORD_CHANGED, outcome=AuditOutcome.SUCCESS, actor_id='after-migrations')"
+    )
+    subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1],
+        env={
+            **os.environ,
+            "APP_ENV": "test",
+            "AUDIT_LOG_FILE": str(log_file),
+            "DATABASE_URL": f"sqlite+aiosqlite:///{(tmp_path / 'm.db').as_posix()}",
+        },
+        check=True,
+        capture_output=True,
+    )
+    [record] = [json.loads(line) for line in log_file.read_text(encoding="utf-8").splitlines()]
+    assert record["actor_id"] == "after-migrations"

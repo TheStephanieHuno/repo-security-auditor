@@ -1,10 +1,14 @@
+import sys
 import httpx
 import uuid
 import time
 
 BASE_URL = "http://127.0.0.1:8000/api"
 
+RESULTS: list[tuple[str, bool]] = []
+
 def print_test(name: str, passed: bool, detail: str = ""):
+    RESULTS.append((name, passed))
     status = "✅ PASS" if passed else "❌ FAIL"
     print(f"{status} | {name} {f'({detail})' if detail else ''}")
 
@@ -111,9 +115,16 @@ def run_e2e_tests():
     metrics = dash_res.json().get("data", {})
     print_test("13. Dashboard Metrics Aggregation from PostgreSQL", passed, f"Repos: {metrics.get('repositories')}, Scans: {metrics.get('scans', {}).get('total')}")
 
+    failed = [name for name, ok in RESULTS if not ok]
     print("\n" + "="*70)
-    print(" 🏁 ALL 13 POSTGRESQL LIVE E2E TESTS COMPLETED SUCCESSFULLY!")
+    if failed:
+        print(f" ❌ {len(failed)} OF {len(RESULTS)} LIVE E2E CHECKS FAILED:")
+        for name in failed:
+            print(f"    - {name}")
+    else:
+        print(f" 🏁 ALL {len(RESULTS)} POSTGRESQL LIVE E2E CHECKS PASSED")
     print("="*70 + "\n")
+    return not failed
 
 if __name__ == "__main__":
-    run_e2e_tests()
+    sys.exit(0 if run_e2e_tests() else 1)
