@@ -40,6 +40,15 @@ def test_secret_scanner_finds_keys_and_never_stores_them(tmp_path: Path) -> None
         assert "********" in finding["codeSnippet"]
 
 
+def test_secret_scanner_reads_key_files_and_env_variants(tmp_path: Path) -> None:
+    (tmp_path / "artifacts").mkdir()
+    (tmp_path / "artifacts" / "server.key").write_text("-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n")
+    (tmp_path / "id_rsa").write_text("-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn...\n")
+    (tmp_path / ".env.local").write_text(f"AWS={AWS_KEY}\n")
+    files = {f["filePath"] for f in run(SecretScanner(), tmp_path)}
+    assert files == {"artifacts/server.key", "id_rsa", ".env.local"}
+
+
 def test_secret_scanner_ignores_lockfile_integrity_hashes(tmp_path: Path) -> None:
     # Base64 integrity hashes contain AKIA-like runs (previously matched case-insensitively).
     (tmp_path / "package-lock.json").write_text(

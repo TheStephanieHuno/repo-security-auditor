@@ -11,6 +11,21 @@ SECRET_PATTERNS = [
 ]
 
 
+# Source, config, and key-material files that can hold credentials (US-09:
+# AWS keys, GitHub tokens, Stripe keys, RSA/SSH private keys).
+SCANNED_SUFFIXES = (
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".yaml", ".yml", ".env", ".txt",
+    ".conf", ".cfg", ".ini", ".toml", ".properties", ".xml", ".sh", ".rb", ".go", ".java", ".php",
+    ".cs", ".tf", ".key", ".pem", ".p8", ".ppk",
+)
+KEY_FILE_NAMES = {"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
+
+
+def should_scan(file_name: str) -> bool:
+    lowered = file_name.lower()
+    return lowered.endswith(SCANNED_SUFFIXES) or lowered.startswith(".env") or lowered in KEY_FILE_NAMES
+
+
 def mask_secret(line: str, secret: str) -> str:
     """Never store a usable credential: keep the first 4 characters only."""
     return line.replace(secret, secret[:4] + "*" * 8)
@@ -26,7 +41,7 @@ class SecretScanner(SecurityCheck):
         for root, dirs, files in os.walk(repo_path):
             dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "venv", ".venv", "__pycache__")]
             for file in files:
-                if file.endswith((".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".txt", ".conf", ".ini")):
+                if should_scan(file):
                     file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, repo_path).replace("\\", "/")
                     try:
