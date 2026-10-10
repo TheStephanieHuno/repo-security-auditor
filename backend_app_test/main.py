@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,11 +23,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Dev origins for the Next.js frontend. Next.js silently moves to the next free
+# port when 3000 is taken, so allow a small range or sign-up gets blocked by CORS
+# and surfaces as "could not reach the API". Override with CORS_ORIGINS (comma-separated).
+_DEFAULT_CORS_ORIGINS = ",".join(
+    origin
+    for port in range(3000, 3006)
+    for origin in (f"http://localhost:{port}", f"http://127.0.0.1:{port}")
+) + ",http://localhost:8000,http://127.0.0.1:8000"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000", "http://127.0.0.1:3000",
-        "http://localhost:8000", "http://127.0.0.1:8000",
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS).split(",")
+        if origin.strip()
     ],
     allow_credentials=True,
     allow_methods=["*"],
