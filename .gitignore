@@ -16,15 +16,25 @@ htmlcov/
 
 # Logs
 *.log
+logs/
+*-debug.log*
 
-# Environment variables
+# Environment variables (frontend .env.local included); keep the example
 .env
-.env.*
+.env*
+.env*.local
 !.env.example
 
-# Node
+# Node / Next.js (frontend)
 node_modules/
 .next/
+out/
+build/
+dist/
+.cache/
+*.tsbuildinfo
+.claude-replay.*
+.tmp-*
 
 # IDE
 .vscode/
@@ -39,7 +49,6 @@ node_modules/
 
 # Local intern onboarding guides (never pushed)
 /INTERN-*.md
-
 
 # Task reviews
 Review
