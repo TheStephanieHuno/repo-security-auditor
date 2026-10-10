@@ -14,8 +14,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# git is required at runtime: scans run in the API process and clone repositories.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /root/.local /root/.local
