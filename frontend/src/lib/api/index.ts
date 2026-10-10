@@ -42,6 +42,23 @@ import { endpoints } from "./endpoints"
 const isLive = process.env.NEXT_PUBLIC_API_MODE === "live"
 export { isLive }
 
+// Largest pageSize the API accepts (openapi.yaml: pageSize maximum).
+export const API_MAX_PAGE_SIZE = 100
+
+// Fetch pages of API_MAX_PAGE_SIZE until `limit` items or the last page.
+async function fetchAllPages<T>(
+  fetchPage: (page: number) => Promise<Paginated<T>>,
+  limit: number,
+): Promise<Paginated<T>> {
+  const first = await fetchPage(1)
+  const items = [...first.items]
+  const totalPages = Math.ceil(first.total / API_MAX_PAGE_SIZE)
+  for (let page = 2; page <= totalPages && items.length < limit; page++) {
+    items.push(...(await fetchPage(page)).items)
+  }
+  return { items: items.slice(0, limit), total: first.total, page: 1, page_size: limit }
+}
+
 interface ApiRepository {
   id: string
   name: string
@@ -424,13 +441,23 @@ export const api = {
   // ─── Findings ──────────────────────────────────────────────────────────────
   getFindings: (query: FindingQuery = {}): Promise<Paginated<Finding>> => {
     if (isLive) {
-      const qs = new URLSearchParams()
-      if (query.page) qs.append("page", query.page.toString())
-      if (query.page_size) qs.append("pageSize", query.page_size.toString())
-      if (query.scan_id) qs.append("scanId", query.scan_id)
-      if (query.repo_id) qs.append("repositoryId", query.repo_id)
-      appendFindingFilters(qs, query)
-      return apiClient.get<Paginated<ApiFinding>>(`${endpoints.findings.list}?${qs.toString()}`)
+      const fetchPage = (page: number | undefined, pageSize: number | undefined) => {
+        const qs = new URLSearchParams()
+        if (page) qs.append("page", page.toString())
+        if (pageSize) qs.append("pageSize", pageSize.toString())
+        if (query.scan_id) qs.append("scanId", query.scan_id)
+        if (query.repo_id) qs.append("repositoryId", query.repo_id)
+        appendFindingFilters(qs, query)
+        return apiClient.get<Paginated<ApiFinding>>(`${endpoints.findings.list}?${qs.toString()}`)
+      }
+      const requested = query.page_size
+      // The API caps pageSize at API_MAX_PAGE_SIZE (openapi.yaml). Larger requests
+      // ("all findings" views) are served by fetching every page and combining them.
+      if (requested && requested > API_MAX_PAGE_SIZE && !query.page) {
+        return fetchAllPages((page) => fetchPage(page, API_MAX_PAGE_SIZE), requested)
+          .then(res => ({ ...res, items: res.items.map(mapFinding) }))
+      }
+      return fetchPage(query.page, requested)
         .then(res => ({ ...res, items: res.items.map(mapFinding) }))
     }
     return mock.mockGetFindings(query)

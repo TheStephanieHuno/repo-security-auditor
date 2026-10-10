@@ -54,7 +54,7 @@ import {
   type Severity,
 } from "@/lib/security-model"
 import { useRepositories, useTriggerScan, useGitHubStatus, useRepositoryBranches, useScans, useFindings, useCancelScan } from "@/lib/api/hooks"
-import { isLive } from "@/lib/api/index"
+import { api, isLive } from "@/lib/api/index"
 import { useDownloadReportPdf, useGenerateReport, useReport } from "@/lib/api/hooks"
 import { getScanOutcome, scanOutcomeLabels } from "@/lib/scan-status"
 
@@ -885,6 +885,9 @@ export function ScanDialog({
     </Dialog>
   )
 }
+const REPORT_POLL_INTERVAL_MS = 1500
+const REPORT_READY_TIMEOUT_MS = 90_000
+
 export function DownloadReport({
   scanId,
   variant = "outline",
@@ -900,9 +903,17 @@ export function DownloadReport({
     try {
       let report = existing
       if (report?.status !== "ready") {
-        report = await generate({ scan_id: scanId })
-        if (report.status === "generating") {
-          toast.success("Report generation started. It will be available shortly.")
+        report = report?.status === "generating" ? report : await generate({ scan_id: scanId })
+        // The server builds the PDF asynchronously (generating -> ready | failed);
+        // wait for it so a single click downloads the report.
+        const deadline = Date.now() + REPORT_READY_TIMEOUT_MS
+        while (report.status === "generating" && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, REPORT_POLL_INTERVAL_MS))
+          report = await api.getReport(report.id)
+        }
+        if (report.status === "failed") throw new Error("The report could not be generated.")
+        if (report.status !== "ready") {
+          toast.info("The report is still being generated. Try again in a moment.")
           return
         }
       }

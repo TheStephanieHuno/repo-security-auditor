@@ -18,14 +18,24 @@ import type {
   UserSettings,
 } from "@/types"
 
+// Omit unset trailing arguments so that, e.g., queryKeys.repositories() is the
+// prefix ["repositories"] and invalidates every page/size variant. Keeping
+// `undefined` in the key made it match nothing, so lists went stale after
+// creating or deleting a repository, scan, or report.
+const key = (...parts: unknown[]) => {
+  const trimmed = [...parts]
+  while (trimmed.length && trimmed[trimmed.length - 1] === undefined) trimmed.pop()
+  return trimmed
+}
+
 export const queryKeys = {
   session: ["session"] as const,
   repositories: (page?: number, pageSize?: number) =>
-    ["repositories", page, pageSize] as const,
+    key("repositories", page, pageSize),
   repository: (id: string) => ["repository", id] as const,
   repositoryBranches: (id: string) => ["repositoryBranches", id] as const,
   scans: (page?: number, pageSize?: number, repoId?: string) =>
-    ["scans", page, pageSize, repoId] as const,
+    key("scans", page, pageSize, repoId),
   scan: (id: string) => ["scan", id] as const,
   scanStatus: (id: string) => ["scanStatus", id] as const,
   scanFindings: (scanId: string, query: FindingQuery) =>
@@ -33,7 +43,7 @@ export const queryKeys = {
   findings: (query: FindingQuery) => ["findings", query] as const,
   finding: (id: string) => ["finding", id] as const,
   reports: (page?: number, pageSize?: number) =>
-    ["reports", page, pageSize] as const,
+    key("reports", page, pageSize),
   report: (id: string) => ["report", id] as const,
   dashboard: ["dashboard"] as const,
   github: ["github"] as const,
