@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend_app_test.db.session import get_db
 from backend_app_test.db.models import User as DBUser
 from backend_app_test.core.security import hash_password, verify_password, create_access_token
+from backend_app_test.core.audit import AuditEvent, AuditOutcome, audit_event, email_fingerprint
 from backend_app_test.schemas.generated import (
     LoginRequest, RegisterRequest, AuthResponse, User, UserRole,
     PasswordResetRequest, PasswordResetConfirm, GenericSuccess,
@@ -36,10 +37,18 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(status="success", data={"token": token, "user": user_response})
 
 @router.post("/login", response_model=AuthResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(DBUser).where(DBUser.email == body.email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):
+        audit_event(
+            AuditEvent.LOGIN_FAILED,
+            outcome=AuditOutcome.FAILURE,
+            request=request,
+            actor_id=user.id if user else None,
+            reason="unknown_account" if user is None else "invalid_password",
+            email_hash=email_fingerprint(body.email),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
     token = create_access_token(str(user.id))
     role_val = UserRole(user.role) if hasattr(user, "role") and user.role in [r.value for r in UserRole] else UserRole.developer
@@ -47,10 +56,18 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(status="success", data={"token": token, "user": user_response})
 
 @router.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(DBUser).where(DBUser.email == form_data.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(form_data.password, user.hashed_password):
+        audit_event(
+            AuditEvent.LOGIN_FAILED,
+            outcome=AuditOutcome.FAILURE,
+            request=request,
+            actor_id=user.id if user else None,
+            reason="unknown_account" if user is None else "invalid_password",
+            email_hash=email_fingerprint(form_data.username),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password.", headers={"WWW-Authenticate": "Bearer"})
     token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer"}

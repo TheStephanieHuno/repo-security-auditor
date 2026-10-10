@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend_app_test.db.session import engine, Base
-from backend_app_test.db import models
+from backend_app_test.db import models  # noqa: F401  (registers tables before create_all)
 from backend_app_test.routers import (
     auth, users, repositories, scans, findings, reports, dashboard, integrations,
 )

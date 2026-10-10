@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend_app_test.db.session import get_db
 from backend_app_test.core.dependencies import get_current_user
 from backend_app_test.db.models import Repository as DBRepository, Scan as DBScan, Finding as DBFinding, User as DBUser
-from backend_app_test.schemas.generated import DashboardResponse, DashboardMetrics, FindingsCount, Scan, Finding, Severity, Confidence, ReviewStatus, ScanStatus
+from backend_app_test.schemas.generated import DashboardResponse, DashboardMetrics
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

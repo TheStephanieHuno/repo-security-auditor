@@ -77,14 +77,18 @@ async def start_scan(
     await db.commit()
     await db.refresh(new_scan)
 
-    # Dispatch scan execution in background thread
-    background_tasks.add_task(
-        run_in_process_fallback,
-        str(new_scan.id),
-        repo.url,
-        body.branch,
-        str(repo.id)
-    )
+    # Dispatch to the arq scan worker (resource-limited container). If Redis is
+    # unreachable, run in this process so scans still complete.
+    job_args = (str(new_scan.id), repo.url, body.branch, str(repo.id))
+    enqueued = False
+    pool = await get_redis_pool()
+    if pool is not None:
+        try:
+            enqueued = await pool.enqueue_job("process_scan_job", *job_args) is not None
+        except Exception as exc:
+            logger.warning("Scan queue unavailable, running in-process: %s", exc)
+    if not enqueued:
+        background_tasks.add_task(run_in_process_fallback, *job_args)
 
     return ScanResponse(
         status="success",

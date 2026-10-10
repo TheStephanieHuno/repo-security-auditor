@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from backend_app_test.core.dependencies import CurrentUser, DBSession
 from backend_app_test.core.security import hash_password, verify_password
+from backend_app_test.core.audit import AuditEvent, AuditOutcome, audit_event
 from backend_app_test.db.models import User as DBUser
 from backend_app_test.schemas.generated import (
     User, UserRole, UserResponse, UpdateProfileRequest, ChangePasswordRequest,
@@ -41,12 +42,16 @@ async def update_profile(body: UpdateProfileRequest, current_user: CurrentUser, 
     return UserResponse(status="success", data=user_data)
 
 @router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(body: ChangePasswordRequest, current_user: CurrentUser, db: DBSession):
+async def change_password(body: ChangePasswordRequest, request: Request, current_user: CurrentUser, db: DBSession):
     if not verify_password(body.currentPassword, current_user.hashed_password):
+        audit_event(AuditEvent.PASSWORD_CHANGE_FAILED, outcome=AuditOutcome.FAILURE, request=request,
+                    actor_id=current_user.id, reason="invalid_current_password")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password incorrect.")
     current_user.hashed_password = hash_password(body.newPassword)
     current_user.updated_at = datetime.now(timezone.utc)
     await db.commit()
+    # Logged after the commit so the audit trail never records an unsaved change.
+    audit_event(AuditEvent.PASSWORD_CHANGED, outcome=AuditOutcome.SUCCESS, request=request, actor_id=current_user.id)
     return None
 
 @router.get("/me/settings", response_model=NotificationSettingsResponse)

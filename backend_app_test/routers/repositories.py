@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from backend_app_test.db.session import get_db
 from backend_app_test.core.dependencies import get_current_user
 from backend_app_test.db.models import Repository as DBRepository, User as DBUser
 from backend_app_test.core.access import verify_user_owns_repository
+from backend_app_test.core.audit import AuditEvent, AuditOutcome, audit_event
 from backend_app_test.services.github_service import validate_github_repository, fetch_github_branches
 from backend_app_test.schemas.generated import (
     Repository, RepositoryResponse, RepositoryListResponse, ValidateRepoRequest,
@@ -63,10 +64,13 @@ async def get_repository(id: uuid.UUID, current_user: DBUser = Depends(get_curre
     return RepositoryResponse(status="success", data=Repository(id=repo.id, url=repo.url, name=repo.name, owner=repo.owner, provider=repo.provider, defaultBranch=repo.default_branch, isValid=repo.is_valid, addedBy=repo.added_by, createdAt=ensure_utc(repo.created_at), updatedAt=ensure_utc(repo.updated_at)))
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_repository(id: uuid.UUID, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await verify_user_owns_repository(db, id, current_user)
+async def remove_repository(id: uuid.UUID, request: Request, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    repo = await verify_user_owns_repository(db, id, current_user)
+    repository_url = repo.url
     await db.execute(delete(DBRepository).where(DBRepository.id == id))
     await db.commit()
+    audit_event(AuditEvent.REPOSITORY_DELETED, outcome=AuditOutcome.SUCCESS, request=request,
+                actor_id=current_user.id, repository_id=id, repository_url=repository_url)
     return None
 
 @router.get("/{id}/branches", response_model=BranchListResponse)

@@ -2,12 +2,13 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend_app_test.db.session import get_db
 from backend_app_test.core.dependencies import get_current_user
+from backend_app_test.core.audit import AuditEvent, AuditOutcome, audit_event
 from backend_app_test.db.models import Finding as DBFinding, Repository as DBRepository, User as DBUser
 from backend_app_test.schemas.generated import (
     Finding, FindingResponse, FindingListResponse, ReviewFindingRequest,
@@ -77,15 +78,23 @@ async def get_finding(id: uuid.UUID, current_user: DBUser = Depends(get_current_
     return FindingResponse(status="success", data=_finding_to_response(finding))
 
 @router.patch("/{id}", response_model=FindingResponse)
-async def review_finding(id: uuid.UUID, body: ReviewFindingRequest, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def review_finding(id: uuid.UUID, body: ReviewFindingRequest, request: Request, current_user: DBUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     query = select(DBFinding).join(DBRepository, DBFinding.repository_id == DBRepository.id).where(DBFinding.id == id, DBRepository.added_by == current_user.id)
     finding = (await db.execute(query)).scalar_one_or_none()
     if not finding:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Finding not found or access denied.")
+    previous_status = finding.review_status
     finding.review_status = body.reviewStatus.value if hasattr(body.reviewStatus, "value") else body.reviewStatus
     finding.review_note = body.reviewNote
     finding.reviewed_by = current_user.id
     finding.reviewed_at = datetime.now(timezone.utc)
     await db.commit()
+    audit_event(
+        AuditEvent.FINDING_REVIEW_UPDATED, outcome=AuditOutcome.SUCCESS, request=request,
+        actor_id=current_user.id, finding_id=id, previous_status=previous_status,
+        new_status=finding.review_status,
+        # Note text may be sensitive; record only that one exists.
+        note_provided=bool(finding.review_note), note_length=len(finding.review_note or ""),
+    )
     await db.refresh(finding)
     return FindingResponse(status="success", data=_finding_to_response(finding))

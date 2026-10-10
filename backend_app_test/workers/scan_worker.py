@@ -1,11 +1,10 @@
 import uuid
-import asyncio
 import logging
 from datetime import datetime, timezone
 from sqlalchemy import select
 
 from backend_app_test.db.session import AsyncSessionLocal
-from backend_app_test.db.models import Scan as DBScan, Finding as DBFinding
+from backend_app_test.db.models import Scan as DBScan
 from backend_app_test.services.scanner.runner import run_full_security_scan
 from backend_app_test.services.scanner.normalizer import normalize_scanner_findings
 from backend_app_test.workers.queue import redis_settings
