@@ -1,17 +1,20 @@
 import os
 import re
-import json
-import shutil
-import asyncio
 from typing import List, Dict, Any
 from backend_app_test.services.scanner.base import SecurityCheck
 
 SECRET_PATTERNS = [
-    {"title": "Hardcoded AWS Access Key", "category": "Secret Exposure", "severity": "critical", "confidence": "high", "pattern": r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}", "recommendation": "Revoke AWS key immediately."},
-    {"title": "Hardcoded GitHub Personal Access Token", "category": "Secret Exposure", "severity": "critical", "confidence": "high", "pattern": r"ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}", "recommendation": "Revoke GitHub token."},
+    {"title": "Hardcoded AWS Access Key", "category": "Secret Exposure", "severity": "critical", "confidence": "high", "pattern": r"\b(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b", "recommendation": "Revoke AWS key immediately."},
+    {"title": "Hardcoded GitHub Personal Access Token", "category": "Secret Exposure", "severity": "critical", "confidence": "high", "pattern": r"\bghp_[a-zA-Z0-9]{36}\b|\bgithub_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}\b", "recommendation": "Revoke GitHub token."},
     {"title": "Exposed Private Cryptographic Key", "category": "Secret Exposure", "severity": "critical", "confidence": "high", "pattern": r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "recommendation": "Rotate private key pair."},
-    {"title": "Hardcoded Stripe Secret API Key", "category": "Secret Exposure", "severity": "high", "confidence": "high", "pattern": r"sk_live_[0-9a-zA-Z]{24}", "recommendation": "Rotate Stripe key."}
+    {"title": "Hardcoded Stripe Secret API Key", "category": "Secret Exposure", "severity": "high", "confidence": "high", "pattern": r"\bsk_live_[0-9a-zA-Z]{24,}\b", "recommendation": "Rotate Stripe key."}
 ]
+
+
+def mask_secret(line: str, secret: str) -> str:
+    """Never store a usable credential: keep the first 4 characters only."""
+    return line.replace(secret, secret[:4] + "*" * 8)
+
 
 class SecretScanner(SecurityCheck):
     @property
@@ -30,7 +33,10 @@ class SecretScanner(SecurityCheck):
                         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                             for line_num, line in enumerate(f, start=1):
                                 for p in SECRET_PATTERNS:
-                                    if re.search(p["pattern"], line, re.IGNORECASE):
+                                    # Case-sensitive: key formats have fixed case, and
+                                    # IGNORECASE matched base64 hashes in lock files.
+                                    match = re.search(p["pattern"], line)
+                                    if match:
                                         findings.append({
                                             "title": p["title"],
                                             "category": p["category"],
@@ -40,7 +46,7 @@ class SecretScanner(SecurityCheck):
                                             "filePath": rel_path,
                                             "lineStart": line_num,
                                             "lineEnd": line_num,
-                                            "codeSnippet": line.strip()[:150],
+                                            "codeSnippet": mask_secret(line.strip(), match.group(0))[:150],
                                             "recommendation": p["recommendation"]
                                         })
                     except Exception:

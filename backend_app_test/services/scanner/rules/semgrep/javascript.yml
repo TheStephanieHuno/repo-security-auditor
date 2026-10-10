@@ -1,0 +1,140 @@
+# Repo Security Auditor Semgrep rules for JavaScript/TypeScript
+# (SRS FR-04, ticket O-08). Test targets: tests/fixtures/semgrep/javascript.js.
+rules:
+  - id: rsa-js-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      eval() on a non-literal value executes attacker-controlled input as
+      JavaScript.
+    patterns:
+      - pattern: eval($CODE)
+      - pattern-not: eval("...")
+    metadata:
+      title: Dynamic code execution with eval
+      cwe: ["CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"]
+      confidence: MEDIUM
+      recommendation: >-
+        Remove eval. Use JSON.parse for data and explicit lookup tables for
+        dynamic behavior.
+
+  - id: rsa-js-new-function
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      new Function() compiles a string into code at runtime, which is
+      equivalent to eval.
+    patterns:
+      - pattern: new Function(..., $BODY)
+      - pattern-not: new Function(..., "...")
+    metadata:
+      title: Dynamic code execution with new Function
+      cwe: ["CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"]
+      confidence: MEDIUM
+      recommendation: Replace runtime code generation with ordinary functions.
+
+  - id: rsa-js-child-process-exec
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      child_process.exec/execSync runs its argument through a shell; a
+      non-literal command allows command injection.
+    patterns:
+      - pattern-either:
+          - pattern: require('child_process').$EXEC($CMD, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $CP = require('child_process');
+                      ...
+                  - pattern-inside: |
+                      import $CP from 'child_process';
+                      ...
+                  - pattern-inside: |
+                      import * as $CP from 'child_process';
+                      ...
+              - pattern: $CP.$EXEC($CMD, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      const { ..., $EXEC, ... } = require('child_process');
+                      ...
+                  - pattern-inside: |
+                      import { ..., $EXEC, ... } from 'child_process';
+                      ...
+              - pattern: $EXEC($CMD, ...)
+      - metavariable-regex:
+          metavariable: $EXEC
+          regex: ^(exec|execSync)$
+      - pattern-not: $F("...", ...)
+    metadata:
+      title: Shell command injection via child_process.exec
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: MEDIUM
+      recommendation: >-
+        Use execFile/spawn with an argument array and no shell, and validate
+        every argument against an allowlist.
+
+  - id: rsa-js-dom-xss-sink
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A non-literal value is written to an HTML sink, which allows cross-site
+      scripting if the value contains user input.
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $VALUE
+          - pattern: $EL.outerHTML = $VALUE
+          - pattern: document.write($VALUE)
+          - pattern: $EL.insertAdjacentHTML($POS, $VALUE)
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+      - pattern-not: document.write("...")
+      - pattern-not: $EL.insertAdjacentHTML($POS, "...")
+    metadata:
+      title: Cross-site scripting through an HTML sink
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: MEDIUM
+      recommendation: >-
+        Assign textContent instead, or sanitize the HTML with a vetted library
+        such as DOMPurify before inserting it.
+
+  - id: rsa-js-sql-string-building
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A SQL statement is built by concatenation or template interpolation and
+      passed to a query function, which allows SQL injection.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$QUERY("..." + $VALUE, ...)
+          - pattern: $DB.$QUERY(`...${$VALUE}...`, ...)
+      - metavariable-regex:
+          metavariable: $QUERY
+          # Query APIs of pg, mysql2, sqlite3, knex, sequelize and prisma.
+          regex: ^(query|execute|raw|\$queryRawUnsafe|\$executeRawUnsafe)$
+    metadata:
+      title: SQL injection through string-built query
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: MEDIUM
+      recommendation: >-
+        Use placeholders ($1, ?) with a values array, or the query builder's
+        parameter binding.
+
+  - id: rsa-js-tls-verification-disabled
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      TLS certificate verification is disabled, allowing man-in-the-middle
+      interception.
+    pattern-either:
+      - pattern: |
+          { ..., rejectUnauthorized: false, ... }
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+    metadata:
+      title: TLS certificate verification disabled
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      recommendation: >-
+        Keep certificate verification on; supply a custom CA with the `ca`
+        option when using private certificates.
