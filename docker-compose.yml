@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rsa_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: auditor
+      POSTGRES_PASSWORD: auditor123
+      POSTGRES_DB: repo_auditor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auditor -d repo_auditor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rsa_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rsa_api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://auditor:auditor123@postgres:5432/repo_auditor
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=repo-security-auditor-production-grade-secret-key-minimum-256-bits
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  scan-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: rsa_worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://auditor:auditor123@postgres:5432/repo_auditor
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=repo-security-auditor-production-grade-secret-key-minimum-256-bits
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - CLONE_TIMEOUT_SECONDS=60
+      - SCAN_TIMEOUT_SECONDS=300
+      - MAX_CLONE_SIZE_MB=100
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1024M
+        reservations:
+          cpus: "0.50"
+          memory: 256M
+
+volumes:
+  pgdata:
